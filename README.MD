@@ -1,4 +1,4 @@
-### Juicepass Proxy
+# Juicepass Proxy
 
 Builds upon some work by lovely folks in this issue:
 
@@ -17,7 +17,7 @@ Hopefully we won't need this if EnelX fixes their API!
 5. Nothing happens!
 6. Configure your DNS server running on your network (like Pihole! or your router) to route all DNS requests to EnelX to the machine running this proxy. For me this was `juicenet-udp-prod3-usa.enelx.com`. See below for instructions to determine that.
 
-# CLI Options
+### CLI Options
 
 ```
 options:
@@ -35,7 +35,7 @@ options:
   --name DEVICE_NAME    Home Assistant Device Name (default: Juicebox)
 ```
 
-# Getting EnelX server IPs
+### Getting EnelX server IPs
 
 To get the destination IP:Port of the EnelX server, telnet to your Juicenet device:
 `$ telnet 192.168.x.x 2000`
