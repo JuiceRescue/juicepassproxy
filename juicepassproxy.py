@@ -129,12 +129,12 @@ class JuiceboxMessageHandler(object):
             if message['status'] is None:
                 message['status'] = 'unknown {}'.format(parts[5])
             active = message['status'] == 'charging'
-            message['current'] = float(parts[16].split('A')[1])*0.1 if active else 0.0
-            message['frequency'] = float(parts[12].split('f')[1])*0.01
+            message['current'] = round(float(parts[16].split('A')[1])*0.1,2) if active else 0.0
+            message['frequency'] = round(float(parts[12].split('f')[1])*0.01,2)
             message['power_lifetime'] = float(parts[4].split('L')[1])
             message['power_session'] = float(parts[15].split('E')[1]) if active else 0.0
-            message['temperature'] = float(parts[6].split('T')[1])*1.8+32
-            message['voltage'] = float(parts[3].split('V')[1])*0.1
+            message['temperature'] = round(float(parts[6].split('T')[1])*1.8+32,2)
+            message['voltage'] = round(float(parts[3].split('V')[1])*0.1,2)
         except Exception as e:
             logging.debug('failed to process basic message: {}'.format(e))
             return None
