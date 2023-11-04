@@ -85,6 +85,7 @@ class JuiceboxMessageHandler(object):
         name = "{} Power (Lifetime)".format(self.device_name)
         sensor_info = SensorInfo(name=name, unique_id=name, 
                                  state_class='total_increasing',
+                                 device_class="energy",
                                  unit_of_measurement='Wh',
                                  device=device_info)
         settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
@@ -95,6 +96,7 @@ class JuiceboxMessageHandler(object):
         name = "{} Power (Session)".format(self.device_name)
         sensor_info = SensorInfo(name=name, unique_id=name, 
                                  state_class='total_increasing',
+                                 device_class="energy",
                                  unit_of_measurement='Wh',
                                  device=device_info)
         settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
