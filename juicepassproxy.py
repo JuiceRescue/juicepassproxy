@@ -5,7 +5,7 @@ from ha_mqtt_discoverable import Settings, DeviceInfo
 from ha_mqtt_discoverable.sensors import SensorInfo, Sensor
 
 AP_DESCRIPTION = """
-Juicebox Proxy - by snicker
+Juicepass Proxy - by snicker
 publish Juicebox data from a UDP proxy to MQTT discoverable by HomeAssistant.
 hopefully we won't need this if EnelX fixes their API!
 https://github.com/home-assistant/core/issues/86588
