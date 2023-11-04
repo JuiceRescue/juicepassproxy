@@ -25,49 +25,6 @@ avoid nameserver lookup loops.
 
 
 def basic_message_try_parse(data):
-    """
-    juicebox status
-
-    {% set status = states('input_text.juicebox_raw_data').split(",")[5] %}
-
-    {% if status == 'S0' %}
-    unplugged
-    {% elif status == 'S1' %}
-    plugged
-    {% elif status == 'S2' %}
-    charging
-    {% endif %}
-    juicebox current
-
-    {% if states('sensor.juicebox_plugged') == 'charging' %}
-    {{ states('input_text.juicebox_raw_data').split(",")[16].split("A")[1]|float(default=0) }}
-    {% else %}
-    0.0
-    {% endif %}
-    juicebox frequency
-
-    {{ states('input_text.juicebox_raw_data').split(",")[12].split("f")[1]|float(default=0)*0.01 }}
-
-    juicebox lifetime power
-
-    {{ states('input_text.juicebox_raw_data').split(",")[4].split("L")[1]|float(default=0) }}
-
-    juicebox session power
-
-
-    {% if states('sensor.juicebox_plugged') == 'charging' %}
-    {{ states('input_text.juicebox_raw_data').split(",")[15].split("E")[1]|float(default=0) }}
-    {% else %}
-    0.0
-    {% endif %}
-    juicebox temperature (i changed to Fahrenheit)
-
-    {{ states('input_text.juicebox_raw_data').split(",")[6].split("T")[1]|float(default=0)*1.8+32 }}
-
-    juicebox voltage
-
-    {{ states('input_text.juicebox_raw_data').split(",")[3].split("V")[1]|float(default=0)*0.1 }}
-    """
     message = {'type': 'basic'}
     try:
         parts = str(data).split(',')
