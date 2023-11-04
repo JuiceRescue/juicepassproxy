@@ -41,10 +41,12 @@ To get the destination IP:Port of the EnelX server, telnet to your Juicenet devi
 `$ telnet 192.168.x.x 2000`
 and give a `list` command:
 
+```
 > list
 > ! # Type  Info
 > # 0 FILE  webapp/index.html-1.4.0.24 (1995, 0)
 > # 1 UDPC  juicenet-udp-prod3-usa.enelx.com:8047 (26674)
+```
 
 The address is in the UDPC line- give that an nslookup or other to determine IP
 eg juicenet-udp-prod3-usa.enelx.com is currently 54.161.185.130
