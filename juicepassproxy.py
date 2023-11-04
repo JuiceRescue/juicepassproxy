@@ -37,8 +37,7 @@ class JuiceboxMessageHandler(object):
             'power_lifetime': None,
             'power_session': None,
             'temperature': None,
-            'voltage': None,
-            'charging_time': None
+            'voltage': None
         }
         self._init_devices()
 
@@ -53,7 +52,6 @@ class JuiceboxMessageHandler(object):
         self._init_device_power_session(device_info)
         self._init_device_temperature(device_info)
         self._init_device_voltage(device_info)
-        self._init_device_charging_time(device_info)
 
     def _init_device_status(self, device_info):
         name = "{} Status".format(self.device_name)
@@ -123,16 +121,6 @@ class JuiceboxMessageHandler(object):
         sensor = Sensor(settings)
         self.entities['voltage'] = sensor
 
-    def _init_device_charging_time(self, device_info):
-        name = "{} Charging Time".format(self.device_name)
-        sensor_info = SensorInfo(name=name, unique_id=name, 
-                                 state_class='measurement',
-                                 unit_of_measurement='s',
-                                 device=device_info)
-        settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
-        sensor = Sensor(settings)
-        self.entities['charging_time'] = sensor
-
     def basic_message_try_parse(self, data):
         message = {'type': 'basic'}
         try:
@@ -141,13 +129,12 @@ class JuiceboxMessageHandler(object):
             if message['status'] is None:
                 message['status'] = 'unknown {}'.format(parts[5])
             active = message['status'] in ('plugged','charging')
-            message['current'] = float(parts[16].split('A')[1]) if active else 0.0
+            message['current'] = float(parts[16].split('A')[1])*0.1 if active else 0.0
             message['frequency'] = float(parts[12].split('f')[1])*0.01
             message['power_lifetime'] = float(parts[4].split('L')[1])
             message['power_session'] = float(parts[15].split('E')[1]) if active else 0.0
             message['temperature'] = float(parts[6].split('T')[1])*1.8+32
             message['voltage'] = float(parts[3].split('V')[1])*0.1
-            message['charging_time'] = float(parts[6].split('T')[1]) if active else 0.0
         except:
             logging.debug('failed to process basic message')
             return None
