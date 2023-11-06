@@ -129,8 +129,8 @@ class JuiceboxMessageHandler(object):
 
     def basic_message_try_parse(self, data):
         message = {"type": "basic"}
-        message = {"current": 0}
-        message = {"power_session": 0}
+        message["current"] = 0
+        message["power_session"] = 0
         for part in str(data).split(","):
             if part[0] == "S":
                 message["status"] = {
