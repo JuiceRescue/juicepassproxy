@@ -65,6 +65,7 @@ class JuiceboxMessageHandler(object):
         name = "{} Current".format(self.device_name)
         sensor_info = SensorInfo(name=name, unique_id=name, 
                                  state_class='measurement',
+                                 device_class="current",
                                  unit_of_measurement='A',
                                  device=device_info)
         settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
@@ -75,6 +76,7 @@ class JuiceboxMessageHandler(object):
         name = "{} Frequency".format(self.device_name)
         sensor_info = SensorInfo(name=name, unique_id=name, 
                                  state_class='measurement',
+                                 device_class="frequency",
                                  unit_of_measurement='Hz',
                                  device=device_info)
         settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
@@ -107,6 +109,7 @@ class JuiceboxMessageHandler(object):
         name = "{} Temperature".format(self.device_name)
         sensor_info = SensorInfo(name=name, unique_id=name, 
                                  state_class='measurement',
+                                 device_class="temperature",
                                  unit_of_measurement='°F',
                                  device=device_info)
         settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
@@ -117,6 +120,7 @@ class JuiceboxMessageHandler(object):
         name = "{} Voltage".format(self.device_name)
         sensor_info = SensorInfo(name=name, unique_id=name, 
                                  state_class='measurement',
+                                 device_class="voltage",
                                  unit_of_measurement='V',
                                  device=device_info)
         settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
