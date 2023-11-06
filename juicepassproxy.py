@@ -124,22 +124,34 @@ class JuiceboxMessageHandler(object):
         self.entities['voltage'] = sensor
 
     def basic_message_try_parse(self, data):
-        message = {'type': 'basic'}
-        try:
-            parts = str(data).split(',')
-            message['status'] = {'S0':'unplugged','S1':'plugged','S2':'charging'}.get(parts[5])
-            if message['status'] is None:
-                message['status'] = 'unknown {}'.format(parts[5])
-            active = message['status'] == 'charging'
-            message['current'] = round(float(parts[16].split('A')[1])*0.1,2) if active else 0.0
-            message['frequency'] = round(float(parts[12].split('f')[1])*0.01,2)
-            message['power_lifetime'] = float(parts[4].split('L')[1])
-            message['power_session'] = float(parts[15].split('E')[1]) if active else 0.0
-            message['temperature'] = round(float(parts[6].split('T')[1])*1.8+32,2)
-            message['voltage'] = round(float(parts[3].split('V')[1])*0.1,2)
-        except Exception as e:
-            logging.debug('failed to process basic message: {}'.format(e))
-            return None
+        message = {"type": "basic"}
+        message = {"current": 0}
+        message = {"power_session": 0}
+        for part in str(data).split(","):
+            if part[0] == "S":
+                message["status"] = {
+                    "S0": "unplugged",
+                    "S1": "plugged",
+                    "S2": "charging",
+                    "S00": "unplugged",
+                    "S01": "plugged",
+                    "S02": "charging",
+                }.get(part)
+                if message["status"] is None:
+                    message["status"] = "unknown {}".format(part)
+                active = (message["status"] == "charging")
+            elif part[0] == "A" and active:
+                message["current"] = round(float(part.split("A")[1]) * 0.1, 2)
+            elif part[0] == "f":
+                message["frequency"] = round(float(part.split("f")[1]) * 0.01, 2)
+            elif part[0] == "L":
+                message["power_lifetime"] = float(part.split("L")[1])
+            elif part[0] == "E" and active:
+                message["power_session"] = float(part.split("E")[1])
+            elif part[0] == "T":
+                message["temperature"] = round(float(part.split("T")[1]) * 1.8 + 32, 2)
+            elif part[0] == "V":
+                message["voltage"] = round(float(part.split("V")[1]) * 0.1, 2)
         return message
 
     def basic_message_publish(self, message):
