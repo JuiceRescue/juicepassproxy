@@ -19,7 +19,18 @@ if [ ! -z "${JUICEBOX_LOCAL_IP+x}" ]; then
   else
     echo "ERROR getting EnelX Server from Telnet. Using defaults."
   fi
+  if [ -z "${JUICEBOX_ID+x}" ]; then
+    JUICEBOX_ID=$(/juicepassproxy/telnet_get_juicebox_id.expect ${JUICEBOX_LOCAL_IP} | sed -n 8p)
+    retval=$?
+    if [ ${retval} -ne 0 ]; then
+      unset JUICEBOX_ID
+      echo "ERROR getting JuiceBox ID from Telnet."
+    else
+      JUICEBOX_ID=${JUICEBOX_ID%?}
+    fi
+  fi
 fi
+
 if [ -z "${SRC+x}" ]; then
   SRC=$(ifconfig | sed -En 's/127.0.0.1//;s/.*inet (addr:)?(([0-9]*\.){3}[0-9]*).*/\2/p')
   retval=$?
@@ -40,6 +51,11 @@ fi
 
 JPP_STRING="python /juicepassproxy/juicepassproxy.py --src ${SRC}:${ENELX_PORT} --dst ${DST}:${ENELX_PORT} --host ${MQTT_HOST} --port ${MQTT_PORT} --discovery-prefix ${MQTT_DISCOVERY_PREFIX} --name ${DEVICE_NAME}"
 
+if [ ! -z "${JUICEBOX_ID+x}" ]; then
+  echo "${NOW}: JUICEBOX_ID: ${JUICEBOX_ID}"
+  JPP_STRING+=" --juicebox-id ${JUICEBOX_ID}"
+fi
+
 echo "${NOW}: SRC: ${SRC}"
 echo "${NOW}: DST: ${DST}"
 echo "${NOW}: ENELX_SERVER: ${ENELX_SERVER}"
@@ -54,6 +70,7 @@ if [ ! -z "${MQTT_PASS+x}" ]; then
   echo "${NOW}: MQTT_PASS: $(echo ${MQTT_PASS} | sed -E 's/./*/g')"
   JPP_STRING+=" --password ${MQTT_PASS}"
 fi
+
 echo "${NOW}: MQTT_DISCOVERY_PREFIX: ${MQTT_DISCOVERY_PREFIX}"
 echo "${NOW}: DEVICE_NAME: ${DEVICE_NAME}"
 echo "${NOW}: DEBUG: ${DEBUG}"
