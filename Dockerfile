@@ -1,4 +1,4 @@
-FROM python:3.12-bookworm
+FROM python:3.12-slim-bookworm
 
 ENV MQTT_HOST="127.0.0.1"
 ENV MQTT_PORT=1883
