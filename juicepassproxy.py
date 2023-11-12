@@ -137,9 +137,11 @@ class JuiceboxMessageHandler(object):
                     "S0": "unplugged",
                     "S1": "plugged",
                     "S2": "charging",
+                    "S5": "error",
                     "S00": "unplugged",
                     "S01": "plugged",
                     "S02": "charging",
+                    "S05": "error"
                 }.get(part)
                 if message["status"] is None:
                     message["status"] = "unknown {}".format(part)
