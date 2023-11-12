@@ -171,7 +171,7 @@ class JuiceboxMessageHandler(object):
                 message["temperature"] = round(float(part.split("T")[1]) * 1.8 + 32, 2)
             elif part[0] == "V":
                 message["voltage"] = round(float(part.split("V")[1]) * 0.1, 2)
-        message["power"] = round(message["voltage"] * message["current"], 2)
+        message["power"] = round(message.get("voltage",0) * message.get("current",0), 2)
         return message
 
     def basic_message_publish(self, message):
