@@ -1,4 +1,5 @@
 FROM python:3.12-slim-bookworm
+LABEL org.opencontainers.image.source=https://github.com/snicker/juicepassproxy
 
 ENV MQTT_HOST="127.0.0.1"
 ENV MQTT_PORT=1883
