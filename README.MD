@@ -11,7 +11,7 @@ _Hopefully we won't need this if EnelX fixes their API!_
 ## Docker Compose Installation
 
 ### Features
-*  If JuiceBox Local IP is defined, it will run a telnet script to get the EnelX Server and Port.
+*  If JuiceBox Local IP is defined, it will run a telnet script to get the EnelX Server and Port as well as the JuiceBox ID.
 
 *  If DST is not defined, it will use `dig` with the CloudFlare DNS (1.1.1.1) to get the IP address of the EnelX Server and avoid a DNS lookup loop.
 
@@ -26,6 +26,8 @@ _Hopefully we won't need this if EnelX fixes their API!_
     A.  Set `ports:` to the port listed in the UDCP line _(see [Getting EnelX Server IPs](#getting-enelx-server-ips))_.
 
     B. Define the applicable environment variables _(see [Docker Environment Variables](#docker-environment-variables))_.
+
+    C. Specify the location for the config folder
 
 1. Start the Docker container.
 
@@ -58,6 +60,7 @@ services:
       - MQTT_PASS=***
     volumes:
       - /etc/localtime:/etc/localtime:ro
+      - ./config:/config
 ```
 
 ### Docker Environment Variables
@@ -67,6 +70,7 @@ Variable | Required | Description & Default |
 **JUICEBOX_LOCAL_IP** | **Recommended** | If defined, it will attempt to get the EnelX Server and Port using Telnet. If unsuccessful, it will default to the EnelX Server and Port below.
 **SRC** | No | If not defined, it will attempt to get the Local Docker IP. If unsuccessful, it will default to 127.0.0.1.
 **DST** | No | If not defined, it will attempt to get the IP of the EnelX Server. If unsuccessful, it will default to 54.161.185.130. If manually defined, you should only use the IP address of the EnelX Server and not the fully qualified domain name to avoid DNS lookup loops.
+**JUICEBOX_ID**  | No | If not defined, it will attempt to get the JuiceBox ID using Telnet.  
 **ENELX_SERVER** | No | juicenet-udp-prod3-usa.enelx.com
 **ENELX_PORT** | No | 8047
 **MQTT_HOST** | No | 127.0.0.1
