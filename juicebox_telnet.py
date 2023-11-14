@@ -54,7 +54,7 @@ class JuiceboxTelnet(object):
     def get_all(self):
         tn = self.open()
         tn.write(b"\n")
-        tn.read_until(b"> ")
+        tn.read_until(b">")
         cmd = f"get all\r\n".encode("ascii")
         tn.write(cmd)
         tn.read_until(cmd)
@@ -67,3 +67,23 @@ class JuiceboxTelnet(object):
                 vars[parts[0]] = parts[1]
         return vars
         
+    def stream_close(self, id):
+        tn = self.open()
+        tn.write(b"\n")
+        tn.read_until(b">")
+        tn.write(f"stream_close {id}".encode('ascii'))
+        tn.read_until(b">")
+
+    def udpc(self, host, port):
+        tn = self.open()
+        tn.write(b"\n")
+        tn.read_until(b">")
+        tn.write(f"udpc {host} {port}".encode('ascii'))
+        tn.read_until(b">")
+
+    def save(self):
+        tn = self.open()
+        tn.write(b"\n")
+        tn.read_until(b">")
+        tn.write(b"save")
+        tn.read_until(b">")
