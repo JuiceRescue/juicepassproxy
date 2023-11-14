@@ -71,19 +71,19 @@ class JuiceboxTelnet(object):
         tn = self.open()
         tn.write(b"\n")
         tn.read_until(b">")
-        tn.write(f"stream_close {id}".encode('ascii'))
+        tn.write(f"stream_close {id}\n".encode('ascii'))
         tn.read_until(b">")
 
     def udpc(self, host, port):
         tn = self.open()
         tn.write(b"\n")
         tn.read_until(b">")
-        tn.write(f"udpc {host} {port}".encode('ascii'))
+        tn.write(f"udpc {host} {port}\n".encode('ascii'))
         tn.read_until(b">")
 
     def save(self):
         tn = self.open()
         tn.write(b"\n")
         tn.read_until(b">")
-        tn.write(b"save")
+        tn.write(b"save\n")
         tn.read_until(b">")
