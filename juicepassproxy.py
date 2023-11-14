@@ -362,5 +362,5 @@ def main():
         udpc_updater.run_event = False
         udpc_updater_thread.join()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
