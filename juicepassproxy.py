@@ -106,7 +106,7 @@ class JuiceboxMessageHandler(object):
         sensor = Sensor(settings)
         self.entities["frequency"] = sensor
 
-    def _init_device_power_lifetime(self, device_info):
+    def _init_device_energy_lifetime(self, device_info):
         name = "Energy (Lifetime)"
         sensor_info = SensorInfo(
             name=name,
@@ -120,7 +120,7 @@ class JuiceboxMessageHandler(object):
         sensor = Sensor(settings)
         self.entities["energy_lifetime"] = sensor
 
-    def _init_device_power_session(self, device_info):
+    def _init_device_energy_session(self, device_info):
         name = "Energy (Session)"
         sensor_info = SensorInfo(
             name=name,
