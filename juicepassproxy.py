@@ -34,10 +34,11 @@ class JuiceboxMessageHandler(object):
             'status': None,
             'current': None,
             'frequency': None,
-            'power_lifetime': None,
-            'power_session': None,
+            'energy_lifetime': None,
+            'energy_session': None,
             'temperature': None,
-            'voltage': None
+            'voltage': None,
+            'power': None
         }
         self._init_devices()
 
@@ -48,10 +49,11 @@ class JuiceboxMessageHandler(object):
         self._init_device_status(device_info)
         self._init_device_current(device_info)
         self._init_device_frequency(device_info)
-        self._init_device_power_lifetime(device_info)
-        self._init_device_power_session(device_info)
+        self._init_device_energy_lifetime(device_info)
+        self._init_device_energy_session(device_info)
         self._init_device_temperature(device_info)
         self._init_device_voltage(device_info)
+        self._init_device_power(device_info)
 
     def _init_device_status(self, device_info):
         name = "{} Status".format(self.device_name)
@@ -83,8 +85,8 @@ class JuiceboxMessageHandler(object):
         sensor = Sensor(settings)
         self.entities['frequency'] = sensor
 
-    def _init_device_power_lifetime(self, device_info):
-        name = "{} Power (Lifetime)".format(self.device_name)
+    def _init_device_energy_lifetime(self, device_info):
+        name = "{} Energy (Lifetime)".format(self.device_name)
         sensor_info = SensorInfo(name=name, unique_id=name, 
                                  state_class='total_increasing',
                                  device_class="energy",
@@ -92,10 +94,10 @@ class JuiceboxMessageHandler(object):
                                  device=device_info)
         settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
         sensor = Sensor(settings)
-        self.entities['power_lifetime'] = sensor
+        self.entities['energy_lifetime'] = sensor
 
-    def _init_device_power_session(self, device_info):
-        name = "{} Power (Session)".format(self.device_name)
+    def _init_device_energy_session(self, device_info):
+        name = "{} Energy (Session)".format(self.device_name)
         sensor_info = SensorInfo(name=name, unique_id=name, 
                                  state_class='total_increasing',
                                  device_class="energy",
@@ -103,7 +105,7 @@ class JuiceboxMessageHandler(object):
                                  device=device_info)
         settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
         sensor = Sensor(settings)
-        self.entities['power_session'] = sensor
+        self.entities['energy_session'] = sensor
 
     def _init_device_temperature(self, device_info):
         name = "{} Temperature".format(self.device_name)
@@ -126,11 +128,22 @@ class JuiceboxMessageHandler(object):
         settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
         sensor = Sensor(settings)
         self.entities['voltage'] = sensor
+    
+    def _init_device_power(self, device_info):
+        name = "{} Power".format(self.device_name)
+        sensor_info = SensorInfo(name=name, unique_id=name, 
+                                state_class='measurement',
+                                device_class="power",
+                                unit_of_measurement='W',
+                                device=device_info)
+        settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
+        sensor = Sensor(settings)
+        self.entities['power'] = sensor
 
     def basic_message_try_parse(self, data):
         message = {"type": "basic"}
         message["current"] = 0
-        message["power_session"] = 0
+        message["energy_session"] = 0
         for part in str(data).split(","):
             if part[0] == "S":
                 message["status"] = {
@@ -151,13 +164,14 @@ class JuiceboxMessageHandler(object):
             elif part[0] == "f":
                 message["frequency"] = round(float(part.split("f")[1]) * 0.01, 2)
             elif part[0] == "L":
-                message["power_lifetime"] = float(part.split("L")[1])
+                message["energy_lifetime"] = float(part.split("L")[1])
             elif part[0] == "E" and active:
-                message["power_session"] = float(part.split("E")[1])
+                message["energy_session"] = float(part.split("E")[1])
             elif part[0] == "T":
                 message["temperature"] = round(float(part.split("T")[1]) * 1.8 + 32, 2)
             elif part[0] == "V":
                 message["voltage"] = round(float(part.split("V")[1]) * 0.1, 2)
+        message["power"] = round(message.get("voltage",0) * message.get("current",0), 2)
         return message
 
     def basic_message_publish(self, message):
