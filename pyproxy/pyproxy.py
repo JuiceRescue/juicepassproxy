@@ -19,7 +19,8 @@ import socket
 
 
 FORMAT = '%(asctime)-15s %(levelname)-10s %(message)s'
-logging.basicConfig(format=FORMAT)
+DATEFMT = "%Y-%m-%d %H:%M:%S"
+logging.basicConfig(format=FORMAT, datefmt=DATEFMT)
 LOGGER = logging.getLogger()
 
 LOCAL_DATA_HANDLER = lambda x:x

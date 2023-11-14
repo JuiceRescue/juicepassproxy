@@ -1,0 +1,50 @@
+#!/usr/bin/expect
+log_user 0
+set juicebox_ip [lindex $argv 0]
+set jpp_ip [lindex $argv 1]
+
+set timeout 15
+set ts [timestamp -format "%Y-%m-%d %H:%M:%S"]
+send_user $ts
+send_user " INFO       Connecting to Telnet\n"
+spawn telnet $juicebox_ip 2000
+#set times 0;
+expect "> "
+while { true } {
+  send "list\r"
+  expect {
+    -re "\#\[ ]+2\[ ]+UDPC\[ ]+\[a-zA-Z]+.*\n>" {
+      set ts [timestamp -format "%Y-%m-%d %H:%M:%S"]
+      send_user $ts
+      send_user " INFO       Updating UDPC\n"
+      send "stream_close 2\r"
+      expect "> "
+      send "udpc 10.100.200.50 8047\r"
+      expect "> "
+      #send "save\r"
+      #expect "> "
+      exp_continue
+      sleep 10
+    }
+#    -re "\#\[ ]+1\[ ]+FILE\[ ]+\[a-zA-Z]+.*\n>" {
+#    send "udpc 10.100.200.50 8047\r"
+#    expect "> "
+#    send "save\r"
+#    expect "> "
+#    exp_continue
+#    sleep 10
+#    }
+    -re "\#\[ ]+2\[ ]+UDPC\[ ]+\[0-9]+.*\n>" {
+      exp_continue
+      sleep 10
+    }
+    "> " {
+      close
+      exit
+    }
+  }
+  #set times [ expr $times+1];
+}
+
+close
+exit
