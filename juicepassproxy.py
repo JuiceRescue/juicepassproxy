@@ -108,7 +108,7 @@ class JuiceboxMessageHandler(object):
         sensor = Sensor(settings)
         self.entities["frequency"] = sensor
 
-    def _init_device_power_lifetime(self, device_info):
+    def _init_device_energy_lifetime(self, device_info):
         name = "Energy (Lifetime)"
         sensor_info = SensorInfo(
             name=name,
@@ -122,7 +122,7 @@ class JuiceboxMessageHandler(object):
         sensor = Sensor(settings)
         self.entities["energy_lifetime"] = sensor
 
-    def _init_device_power_session(self, device_info):
+    def _init_device_energy_session(self, device_info):
         name = "Energy (Session)"
         sensor_info = SensorInfo(
             name=name,
@@ -250,17 +250,29 @@ class JuiceboxUDPCUpdater(object):
                 logging.debug("JuiceboxUDPCUpdater check...")
                 with JuiceboxTelnet(self.juicebox_host,2000) as tn:
                     connections = tn.list()
+                    update_required = True
+                    connection_to_update = None
+                    id_to_update = None
+
                     for connection in connections:
-                        logging.debug(f"checking {connection}")
                         if connection['type'] == 'UDPC':
-                            if self.udpc_host not in connection.get('dest'):
-                                logging.debug('UDPC IP incorrect, updating...')
-                                tn.stream_close(str(connection['id']))
-                                tn.udpc(self.udpc_host, self.udpc_port)
-                                tn.save()
-                                logging.debug('UDPC IP Saved')
-                            else:
-                                logging.debug('UDPC IP correct')
+                            connection_to_update = connection
+
+                    if connection_to_update is None:
+                        logging.debug('UDPC IP not found, updating...')
+                    elif self.udpc_host not in connection['dest']:
+                        logging.debug('UDPC IP incorrect, updating...')
+                        id_to_update = connection['id']
+                    else:
+                        logging.debug('UDPC IP correct')
+                        update_required = False
+                    
+                    if update_required:
+                        if id_to_update is not None:
+                            tn.stream_close(id_to_update)
+                        tn.udpc(self.udpc_host, self.udpc_port)
+                        tn.save()
+                        logging.debug('UDPC IP Saved')
             except:
                 logging.exception('Error in JuiceboxUDPCUpdater')
             time.sleep(self.interval)
