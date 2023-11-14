@@ -16,6 +16,6 @@ RUN apt-get update && apt-get upgrade -y
 RUN apt-get install -y git dnsutils net-tools telnet expect yq
 RUN git clone https://github.com/snicker/juicepassproxy.git /juicepassproxy
 RUN pip install --no-cache-dir -r /juicepassproxy/requirements.txt
-RUN chmod +x /juicepassproxy/juicepassproxy.py /juicepassproxy/*.expect
+RUN chmod +x /juicepassproxy/*.sh /juicepassproxy/*.expect
 
 ENTRYPOINT /juicepassproxy/docker_entrypoint.sh

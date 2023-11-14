@@ -34,14 +34,14 @@ class JuiceboxMessageHandler(object):
         self.device_name = device_name
         self.juicebox_id = juicebox_id
         self.entities = {
-            'status': None,
-            'current': None,
-            'frequency': None,
-            'energy_lifetime': None,
-            'energy_session': None,
-            'temperature': None,
-            'voltage': None,
-            'power': None
+            "status": None,
+            "current": None,
+            "frequency": None,
+            "energy_lifetime": None,
+            "energy_session": None,
+            "temperature": None,
+            "voltage": None,
+            "power": None,
         }
         self._init_devices()
 
@@ -160,18 +160,21 @@ class JuiceboxMessageHandler(object):
         )
         settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
         sensor = Sensor(settings)
-        self.entities['voltage'] = sensor
-    
+        self.entities["voltage"] = sensor
+
     def _init_device_power(self, device_info):
         name = "Power"
-        sensor_info = SensorInfo(name=name, nique_id=f"{self.juicebox_id} {name}", 
-                                state_class='measurement',
-                                device_class="power",
-                                unit_of_measurement='W',
-                                device=device_info)
+        sensor_info = SensorInfo(
+            name=name,
+            unique_id=f"{self.juicebox_id} {name}",
+            state_class="measurement",
+            device_class="power",
+            unit_of_measurement="W",
+            device=device_info,
+        )
         settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
         sensor = Sensor(settings)
-        self.entities['power'] = sensor
+        self.entities["power"] = sensor
 
     def basic_message_try_parse(self, data):
         message = {"type": "basic"}
@@ -204,7 +207,9 @@ class JuiceboxMessageHandler(object):
                 message["temperature"] = round(float(part.split("T")[1]) * 1.8 + 32, 2)
             elif part[0] == "V":
                 message["voltage"] = round(float(part.split("V")[1]) * 0.1, 2)
-        message["power"] = round(message.get("voltage",0) * message.get("current",0), 2)
+        message["power"] = round(
+            message.get("voltage", 0) * message.get("current", 0), 2
+        )
         logging.debug(f"message: {message}")
         return message
 
