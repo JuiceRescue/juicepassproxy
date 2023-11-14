@@ -2,6 +2,8 @@
 
 This tool will publish JuiceBox data by using a Man in the Middle UDP proxy to MQTT that is auto-discoverable by HomeAssistant. The `Enel X Way` app will continue to function.
 
+It can also publish the IP of the proxy to the Juicebox directly to avoid using custom local DNS servers using the `update_udpc` and `juicebox_host` command line parameters (not yet supported in Docker).
+
 Builds upon work by lovely folks in this issue: https://github.com/home-assistant/core/issues/86588
 
 _Hopefully we won't need this if EnelX fixes their API!_
@@ -91,6 +93,7 @@ Variable | Required | Description & Default |
 4. Launch by executing `python juicepassproxy.py --dst <enelx IP:port> --host <mqtthost>` (params documented below)
 5. Nothing happens!
 6. Configure your DNS server running on your network (like Pi-hole or your router) to route all DNS requests from EnelX to the machine running this proxy. For me this was `juicenet-udp-prod3-usa.enelx.com`. See below for instructions to determine that.
+7. Alternatively to #6, you can enable `update_udpc` on the command line and set `juicebox_host` and the application will force publish the IP in the `src` flag to the Juicebox and avoid the need to set DNS rules on your router or DNS server.
 
 ### CLI Options
 
@@ -108,6 +111,9 @@ options:
   -D DISCOVERY_PREFIX, --discovery-prefix DISCOVERY_PREFIX
                         Home Assistant MQTT topic prefix (default: homeassistant)
   --name DEVICE_NAME    Home Assistant Device Name (default: Juicebox)
+  --update_udpc         Update UDPC on the Juicebox. Requires --juicebox_host
+  --juicebox_host JUICEBOX_HOST
+                        host or IP address of the Juicebox. required for --update_udpc
 ```
 
 _For **DST**, you should only use the IP address of the EnelX Server and **not** the fully qualified domain name (FQDN) to avoid DNS lookup loops._
