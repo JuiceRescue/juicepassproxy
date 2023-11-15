@@ -331,6 +331,12 @@ def main():
         "--juicebox_host", type=str,
         help="host or IP address of the Juicebox. required for --update_udpc"
     )
+    parser.add_argument(
+        "--juicepass_proxy_host", type=str,
+        help="EXTERNAL host or IP address of the machine running Juicepass" \
+            " Proxy. Optional: only necessary when using --update_udpc and" \
+            " it will be inferred from the address in --src if omitted."
+    )
     args = parser.parse_args()
 
     if args.debug:
@@ -340,8 +346,11 @@ def main():
         raise argparse.ArgumentError(arg_juicebox_host, "juicebox_host is required")
 
     localhost_src = args.src.startswith("0.") or args.src.startswith("127")
-    if args.update_udpc and localhost_src:
-        raise argparse.ArgumentError(arg_src, "src must not be a local IP address for update_udpc to work")
+    if args.update_udpc and localhost_src and not args.juicepass_proxy_host:
+        raise argparse.ArgumentError(arg_src, 
+            "src must not be a local IP address for update_udpc to work, or" \
+            " --juicepass_proxy_host must be used."
+            )
 
     mqttsettings = Settings.MQTT(
         host=args.host,
@@ -363,7 +372,7 @@ def main():
     udpc_updater = None
 
     if args.update_udpc:
-        address = args.src.split(':')
+        address = args.juicepass_proxy_host or args.src.split(':')
         udpc_updater = JuiceboxUDPCUpdater(args.juicebox_host, address[0], address[1])
         udpc_updater_thread = Thread(target=udpc_updater.start)
         udpc_updater_thread.start()
