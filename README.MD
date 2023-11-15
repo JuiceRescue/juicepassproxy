@@ -2,7 +2,7 @@
 
 This tool will publish JuiceBox data by using a Man in the Middle UDP proxy to MQTT that is auto-discoverable by HomeAssistant. The `Enel X Way` app will continue to function.
 
-It can also publish the IP of the proxy to the Juicebox directly to avoid using custom local DNS servers using the `update_udpc` and `juicebox_host` command line parameters (not yet supported in Docker).
+It can also publish the IP of the proxy to the JuiceBox directly to avoid using custom local DNS servers using the `update_udpc` and `juicebox_host` command line parameters.
 
 Builds upon work by lovely folks in this issue: https://github.com/home-assistant/core/issues/86588
 
@@ -19,9 +19,20 @@ _Hopefully we won't need this if EnelX fixes their API!_
 
 *  If SRC is not defined, it will use `ifconfig` to get the Local IP address of the Docker.
 
+* If Update UDPC is true, JuicePass Proxy will continually update the JuiceBox via telnet to send its data to JuicePass Proxy. Use this if you are not able to change your DNS to route the JuiceBox traffic to JuicePass Proxy.
+
 ### Instructions
 
-1. Configure your DNS server running on your network (like Pi-hole or your router) to route all UDP traffic from your JuiceBox to the machine running this proxy. Instructions for how to do this will vary by router. See [Getting EnelX Server IPs](#getting-enelx-server-ips) for instructions on what EnelX Server you need to override.
+1. Pick One Option:
+
+    A. Configure your DNS server running on your network (like Pi-hole or your router) to route all UDP traffic from your JuiceBox to the machine running this proxy. Instructions for how to do this will vary by router. See [Getting EnelX Server IPs](#getting-enelx-server-ips) for instructions on what EnelX Server you need to override.
+
+    B. Set these Docker Environment Variables in your Docker Compose file:</br>
+      ```
+      UPDATE_UDPC=true
+      JUICEBOX_HOST=<IP address of your JuiceBox
+      JPP_HOST=<IP address of the machine that the JuicePass Proxy Docker Container is running on>
+      ```
 
 1. Add the `juicepassproxy` service to your Docker Compose file.
 
@@ -56,7 +67,9 @@ services:
     ports:
       - 8047:8047/udp
     environment:
-      - JUICEBOX_LOCAL_IP=10.100.50.30
+      - JUICEBOX_HOST=10.100.50.30
+      - UPDATE_UDPC=true
+      - JPP_HOST=10.100.200.50
       - MQTT_HOST=10.100.200.5
       - MQTT_USER=mosquitto
       - MQTT_PASS=***
@@ -69,7 +82,7 @@ services:
 
 Variable | Required | Description & Default |
 -- | -- | --
-**JUICEBOX_LOCAL_IP** | **Recommended** | If defined, it will attempt to get the EnelX Server and Port using Telnet. If unsuccessful, it will default to the EnelX Server and Port below.
+**JUICEBOX_HOST** | **Recommended**</br></br>**Required if Update UDPC is True.** | If defined, it will attempt to get the EnelX Server and Port using Telnet. If unsuccessful, it will default to the EnelX Server and Port below.
 **SRC** | No | If not defined, it will attempt to get the Local Docker IP. If unsuccessful, it will default to 127.0.0.1.
 **DST** | No | If not defined, it will attempt to get the IP of the EnelX Server. If unsuccessful, it will default to 54.161.185.130. If manually defined, you should only use the IP address of the EnelX Server and not the fully qualified domain name to avoid DNS lookup loops.
 **JUICEBOX_ID**  | No | If not defined, it will attempt to get the JuiceBox ID using Telnet.  
@@ -81,6 +94,8 @@ Variable | Required | Description & Default |
 **MQTT_PASS** | No |
 **MQTT_DISCOVERY_PREFIX** | No | homeassistant
 **DEVICE_NAME** | No | JuiceBox
+**UPDATE_UDPC** | No | Default: false. If true, will continually update the JuiceBox via telnet to point to JuicePass Proxy.
+**JPP_HOST**  | **Required if Update UDPC is True** |  This is the IP or Hostname of the machine where JuicePass Proxy is running (**not** the IP of the Docker Container)
 **DEBUG** | No | false
 
 
@@ -111,7 +126,9 @@ options:
   -D DISCOVERY_PREFIX, --discovery-prefix DISCOVERY_PREFIX
                         Home Assistant MQTT topic prefix (default: homeassistant)
   --name DEVICE_NAME    Home Assistant Device Name (default: Juicebox)
-  --update_udpc         Update UDPC on the Juicebox. Requires --juicebox_host
+  --juicebox_id JUICEBOX_ID
+                        JuiceBox ID
+  --update_udpc         Update UDPC on the JuiceBox. Requires --juicebox_host
   --juicebox_host JUICEBOX_HOST
                         host or IP address of the Juicebox. required for --update_udpc
   --juicepass_proxy_host JUICEPASS_PROXY_HOST

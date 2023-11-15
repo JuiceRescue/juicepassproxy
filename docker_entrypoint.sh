@@ -74,9 +74,9 @@ else
   logger DEBUG "No Config File Found."
 fi
 
-if [[ ! -z "${JUICEBOX_LOCAL_IP}" ]]; then
+if [[ ! -z "${JUICEBOX_HOST}" ]]; then
   if [[ -z "${JUICEBOX_ID}" ]]; then
-    JUICEBOX_ID=$(${TELNET_GET_JUICEBOX_ID} ${JUICEBOX_LOCAL_IP} | sed -n 8p)
+    JUICEBOX_ID=$(${TELNET_GET_JUICEBOX_ID} ${JUICEBOX_HOST} | sed -n 8p)
     if [[ ! -z "${JUICEBOX_ID}" ]]; then
       logger DEBUG "Sucessfully obtained JuiceBox ID."
       JUICEBOX_ID=${JUICEBOX_ID%?}
@@ -91,12 +91,21 @@ if [[ ! -z "${JUICEBOX_LOCAL_IP}" ]]; then
     fi
   fi
 
-  TELNET_SERVER_STRING=$(${TELNET_GET_SERVER} ${JUICEBOX_LOCAL_IP} | grep "UDPC")
+  TELNET_SERVER_STRING=$(${TELNET_GET_SERVER} ${JUICEBOX_HOST} | grep "UDPC" | head -1)
   if [[ ! -z "${TELNET_SERVER_STRING}" ]]; then
     logger DEBUG "Sucessfully obtained EnelX Server and Port."
     #logger debug "TELNET_SERVER_STRING: ${TELNET_SERVER_STRING}"
     ENELX_SERVER=$(echo ${TELNET_SERVER_STRING} | sed -E 's/(# 2 UDPC[ ]+)(.*)(:.*)/\2/g')
     ENELX_PORT=$(echo ${TELNET_SERVER_STRING} | sed -E 's/(.*:)(.*)([ ]+.*)/\2/g')
+    if valid_ip ${ENELX_SERVER}; then
+      if [[ ! -z "${ENELX_SERVER_CONFIG}" ]] && ! valid_ip ${ENELX_SERVER_CONFIG}; then
+        logger WARNING "EnelX Server is already an IP. Using config."
+        ENELX_SERVER=${ENELX_SERVER_CONFIG}
+      else
+        logger ERROR "EnelX Server is already an IP. Not set in config. Using default."
+        ENELX_SERVER=${ENELX_SERVER_DEFAULT}
+      fi
+    fi
   else
     if [[ ! -z "${ENELX_SERVER_CONFIG}" ]]; then
       logger WARNING "Cannot get EnelX Server from Telnet. Using config."
@@ -146,10 +155,10 @@ fi
 JPP_STRING="python3 ${JUICEPASSPROXY} --src ${SRC}:${ENELX_PORT} --dst ${DST}:${ENELX_PORT} --host ${MQTT_HOST} --port ${MQTT_PORT} --discovery-prefix ${MQTT_DISCOVERY_PREFIX} --name ${DEVICE_NAME}"
 echo ""
 logger INFO "DEVICE_NAME: ${DEVICE_NAME}"
-logger INFO "JUICEBOX_LOCAL_IP: ${JUICEBOX_LOCAL_IP}"
+logger INFO "JUICEBOX_HOST: ${JUICEBOX_HOST}"
 if [[ ! -z "${JUICEBOX_ID}" ]]; then
   logger INFO "JUICEBOX_ID: ${JUICEBOX_ID}"
-  JPP_STRING+=" --juicebox-id ${JUICEBOX_ID}"
+  JPP_STRING+=" --juicebox_id ${JUICEBOX_ID}"
 fi
 
 logger INFO "SRC: ${SRC}"
@@ -168,6 +177,14 @@ if [[ ! -z "${MQTT_PASS}" ]]; then
 fi
 
 logger INFO "MQTT_DISCOVERY_PREFIX: ${MQTT_DISCOVERY_PREFIX}"
+
+logger INFO "UPDATE_UDPC: ${UPDATE_UDPC}"
+if $UPDATE_UDPC; then
+  logger INFO "JPP_HOST: ${JPP_HOST}"
+  JPP_STRING+=" --juicebox_host ${JUICEBOX_HOST}"
+  JPP_STRING+=" --juicebox_proxy_host ${JPP_HOST}"
+  JPP_STRING+=" --update_udpc"
+fi
 
 if $DEBUG; then
   JPP_STRING+=" --debug"
@@ -194,5 +211,5 @@ if $DEBUG; then
   yq e /config/juicepassproxy.yaml
   echo ""
 fi
-logger INFO "COMMAND: $(echo ${JPP_STRING} | sed -E 's/(--password )(\<.*\>)(.*)/\1*****\3/')"
+logger INFO "COMMAND: $(echo ${JPP_STRING} | sed -E 's/(.* --password )([\"]?[a-zA-Z0-9_\?\*\^\&\#\@\!]+[\"]?)/\1*****/g')"
 eval ${JPP_STRING}

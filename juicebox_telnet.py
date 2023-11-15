@@ -1,5 +1,5 @@
 from telnetlib import Telnet
-import logging
+
 
 class JuiceboxTelnet(object):
     def __init__(self, host, port=2000):
@@ -34,13 +34,9 @@ class JuiceboxTelnet(object):
         for line in lines[1:]:
             parts = line.split(" ")
             if len(parts) >= 5:
-                out.append({
-                    'id': parts[1],
-                    'type': parts[2],
-                    'dest': parts[4]
-                })
+                out.append({"id": parts[1], "type": parts[2], "dest": parts[4]})
         return out
-    
+
     def get(self, variable):
         tn = self.open()
         tn.write(b"\n")
@@ -55,7 +51,7 @@ class JuiceboxTelnet(object):
         tn = self.open()
         tn.write(b"\n")
         tn.read_until(b">")
-        cmd = f"get all\r\n".encode("ascii")
+        cmd = "get all\r\n".encode("ascii")
         tn.write(cmd)
         tn.read_until(cmd)
         res = tn.read_until(b">")
@@ -66,19 +62,19 @@ class JuiceboxTelnet(object):
             if len(parts) == 2:
                 vars[parts[0]] = parts[1]
         return vars
-        
+
     def stream_close(self, id):
         tn = self.open()
         tn.write(b"\n")
         tn.read_until(b">")
-        tn.write(f"stream_close {id}\n".encode('ascii'))
+        tn.write(f"stream_close {id}\n".encode("ascii"))
         tn.read_until(b">")
 
     def udpc(self, host, port):
         tn = self.open()
         tn.write(b"\n")
         tn.read_until(b">")
-        tn.write(f"udpc {host} {port}\n".encode('ascii'))
+        tn.write(f"udpc {host} {port}\n".encode("ascii"))
         tn.read_until(b">")
 
     def save(self):

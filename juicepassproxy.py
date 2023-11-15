@@ -2,9 +2,10 @@ import argparse
 import logging
 import time
 from threading import Thread
-from juicebox_telnet import JuiceboxTelnet
+
 from ha_mqtt_discoverable import DeviceInfo, Settings
 from ha_mqtt_discoverable.sensors import Sensor, SensorInfo
+from juicebox_telnet import JuiceboxTelnet
 from pyproxy import pyproxy
 
 AP_DESCRIPTION = """
@@ -236,8 +237,9 @@ class JuiceboxMessageHandler(object):
             self.basic_message_publish(message)
         return data
 
+
 class JuiceboxUDPCUpdater(object):
-    def __init__(self, juicebox_host, udpc_host, udpc_port = 8047):
+    def __init__(self, juicebox_host, udpc_host, udpc_port=8047):
         self.juicebox_host = juicebox_host
         self.udpc_host = udpc_host
         self.udpc_port = udpc_port
@@ -248,34 +250,35 @@ class JuiceboxUDPCUpdater(object):
         while self.run_event:
             try:
                 logging.debug("JuiceboxUDPCUpdater check...")
-                with JuiceboxTelnet(self.juicebox_host,2000) as tn:
+                with JuiceboxTelnet(self.juicebox_host, 2000) as tn:
                     connections = tn.list()
                     update_required = True
                     connection_to_update = None
                     id_to_update = None
 
                     for connection in connections:
-                        if connection['type'] == 'UDPC':
+                        if connection["type"] == "UDPC":
                             connection_to_update = connection
 
                     if connection_to_update is None:
-                        logging.debug('UDPC IP not found, updating...')
-                    elif self.udpc_host not in connection['dest']:
-                        logging.debug('UDPC IP incorrect, updating...')
-                        id_to_update = connection['id']
+                        logging.debug("UDPC IP not found, updating...")
+                    elif self.udpc_host not in connection["dest"]:
+                        logging.debug("UDPC IP incorrect, updating...")
+                        id_to_update = connection["id"]
                     else:
-                        logging.debug('UDPC IP correct')
+                        logging.debug("UDPC IP correct")
                         update_required = False
-                    
+
                     if update_required:
                         if id_to_update is not None:
                             tn.stream_close(id_to_update)
                         tn.udpc(self.udpc_host, self.udpc_port)
                         tn.save()
-                        logging.debug('UDPC IP Saved')
-            except:
-                logging.exception('Error in JuiceboxUDPCUpdater')
+                        logging.debug("UDPC IP Saved")
+            except Exception as e:
+                logging.exception(f"Error in JuiceboxUDPCUpdater: {e}")
             time.sleep(self.interval)
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -321,11 +324,12 @@ def main():
         dest="device_name",
     )
     parser.add_argument(
-        "--juicebox-id", type=str, help="JuiceBox ID", dest="juicebox_id"
+        "--juicebox_id", type=str, help="JuiceBox ID", dest="juicebox_id"
     )
     parser.add_argument(
-        "--update_udpc", action="store_true",
-        help="Update UDPC on the Juicebox. Requires --juicebox_host"
+        "--update_udpc",
+        action="store_true",
+        help="Update UDPC on the Juicebox. Requires --juicebox_host",
     )
     arg_juicebox_host = parser.add_argument(
         "--juicebox_host", type=str,
@@ -382,6 +386,7 @@ def main():
     if udpc_updater is not None and udpc_updater_thread is not None:
         udpc_updater.run_event = False
         udpc_updater_thread.join()
+
 
 if __name__ == "__main__":
     main()
