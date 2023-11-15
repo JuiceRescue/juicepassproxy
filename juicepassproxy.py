@@ -248,6 +248,7 @@ class JuiceboxUDPCUpdater(object):
 
     def start(self):
         while self.run_event:
+            interval = self.interval
             try:
                 logging.debug("JuiceboxUDPCUpdater check...")
                 with JuiceboxTelnet(self.juicebox_host, 2000) as tn:
@@ -275,9 +276,15 @@ class JuiceboxUDPCUpdater(object):
                         tn.udpc(self.udpc_host, self.udpc_port)
                         tn.save()
                         logging.debug("UDPC IP Saved")
+            except ConnectionResetError as e:
+                logging.warning(
+                    "Telnet connection to Juicebox lost- nothing to worry" \
+                    " about unless this happens a lot. Retrying in 3s."
+                    )
+                interval = 3
             except Exception as e:
                 logging.exception(f"Error in JuiceboxUDPCUpdater: {e}")
-            time.sleep(self.interval)
+            time.sleep(interval)
 
 
 def main():
