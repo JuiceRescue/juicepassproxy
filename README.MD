@@ -108,7 +108,7 @@ Variable | Required | Description & Default |
 4. Launch by executing `python juicepassproxy.py --dst <enelx IP:port> --host <mqtthost>` (params documented below)
 5. Nothing happens!
 6. Configure your DNS server running on your network (like Pi-hole or your router) to route all DNS requests from EnelX to the machine running this proxy. For me this was `juicenet-udp-prod3-usa.enelx.com`. See below for instructions to determine that.
-7. Alternatively to #6, you can enable `update_udpc` on the command line and set `juicebox_host` and the application will force publish the IP in the `src` flag to the JuiceBox and avoid the need to set DNS rules on your router or DNS server.
+7. Alternatively to #6, you can enable `update_udpc` on the command line and set `juicebox_host` and the application will force publish the IP in the `src` argument to the Juicebox and avoid the need to set DNS rules on your router or DNS server. **NOTE: if you need to publish a different IP than the one in the `src` argument, you can make use of the `--juicepass_proxy_host` arg.**
 
 ### CLI Options
 
@@ -130,11 +130,10 @@ options:
                         JuiceBox ID
   --update_udpc         Update UDPC on the JuiceBox. Requires --juicebox_host
   --juicebox_host JUICEBOX_HOST
-                        Host or IP address of the JuiceBox. required for --update_udpc
-  --jpp_host JPP_HOST
-                        Host or IP address of the machine that JuicePass Proxy is running on.
-                        Required if --update_udpc is true and --src is not the address of the
-                        machine. (Needed for Docker in bridge mode)
+                        host or IP address of the Juicebox. required for --update_udpc
+  --juicepass_proxy_host JUICEPASS_PROXY_HOST
+                        EXTERNAL host or IP address of the machine running Juicepass Proxy. Optional: only necessary when using --update_udpc and it will be inferred from the address in --src if
+                        omitted.
 ```
 
 _For **DST**, you should only use the IP address of the EnelX Server and **not** the fully qualified domain name (FQDN) to avoid DNS lookup loops._
