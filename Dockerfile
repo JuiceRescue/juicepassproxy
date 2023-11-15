@@ -1,4 +1,6 @@
 FROM python:3.12-slim-bookworm
+# WARNING: Do not update python past 3.12.* if telnetlib is still being used.
+
 LABEL org.opencontainers.image.source=https://github.com/snicker/juicepassproxy
 
 ENV MQTT_HOST="127.0.0.1"
