@@ -386,8 +386,9 @@ def main():
     udpc_updater = None
 
     if args.update_udpc:
-        address = args.juicepass_proxy_host or args.src.split(":")
-        udpc_updater = JuiceboxUDPCUpdater(args.juicebox_host, address[0], address[1])
+        address = args.src.split(":")
+        jpp_host = args.juicepass_proxy_host or address[0]
+        udpc_updater = JuiceboxUDPCUpdater(args.juicebox_host, jpp_host, address[1])
         udpc_updater_thread = Thread(target=udpc_updater.start)
         udpc_updater_thread.start()
 
