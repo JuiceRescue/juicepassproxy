@@ -9,8 +9,8 @@ from juicebox_telnet import JuiceboxTelnet
 from pyproxy import pyproxy
 
 AP_DESCRIPTION = """
-Juicepass Proxy - by snicker
-publish Juicebox data from a UDP proxy to MQTT discoverable by HomeAssistant.
+JuicePass Proxy - by snicker
+publish JuiceBox data from a UDP proxy to MQTT discoverable by HomeAssistant.
 hopefully we won't need this if EnelX fixes their API!
 https://github.com/home-assistant/core/issues/86588
 
@@ -278,9 +278,9 @@ class JuiceboxUDPCUpdater(object):
                         logging.debug("UDPC IP Saved")
             except ConnectionResetError as e:
                 logging.warning(
-                    "Telnet connection to Juicebox lost- nothing to worry" \
-                    " about unless this happens a lot. Retrying in 3s."
-                    )
+                    "Telnet connection to JuiceBox lost- nothing to worry"
+                    f" about unless this happens a lot. Retrying in 3s. ({e})"
+                )
                 interval = 3
             except Exception as e:
                 logging.exception(f"Error in JuiceboxUDPCUpdater: {e}")
@@ -336,17 +336,19 @@ def main():
     parser.add_argument(
         "--update_udpc",
         action="store_true",
-        help="Update UDPC on the Juicebox. Requires --juicebox_host",
+        help="Update UDPC on the JuiceBox. Requires --juicebox_host",
     )
     arg_juicebox_host = parser.add_argument(
-        "--juicebox_host", type=str,
-        help="host or IP address of the Juicebox. required for --update_udpc"
+        "--juicebox_host",
+        type=str,
+        help="Host or IP address of the JuiceBox. required for --update_udpc",
     )
     parser.add_argument(
-        "--juicepass_proxy_host", type=str,
-        help="EXTERNAL host or IP address of the machine running Juicepass" \
-            " Proxy. Optional: only necessary when using --update_udpc and" \
-            " it will be inferred from the address in --src if omitted."
+        "--juicepass_proxy_host",
+        type=str,
+        help="EXTERNAL host or IP address of the machine running JuicePass"
+        " Proxy. Optional: only necessary when using --update_udpc and"
+        " it will be inferred from the address in --src if omitted.",
     )
     args = parser.parse_args()
 
@@ -358,10 +360,11 @@ def main():
 
     localhost_src = args.src.startswith("0.") or args.src.startswith("127")
     if args.update_udpc and localhost_src and not args.juicepass_proxy_host:
-        raise argparse.ArgumentError(arg_src, 
-            "src must not be a local IP address for update_udpc to work, or" \
-            " --juicepass_proxy_host must be used."
-            )
+        raise argparse.ArgumentError(
+            arg_src,
+            "src must not be a local IP address for update_udpc to work, or"
+            " --juicepass_proxy_host must be used.",
+        )
 
     mqttsettings = Settings.MQTT(
         host=args.host,
@@ -383,7 +386,7 @@ def main():
     udpc_updater = None
 
     if args.update_udpc:
-        address = args.juicepass_proxy_host or args.src.split(':')
+        address = args.juicepass_proxy_host or args.src.split(":")
         udpc_updater = JuiceboxUDPCUpdater(args.juicebox_host, address[0], address[1])
         udpc_updater_thread = Thread(target=udpc_updater.start)
         udpc_updater_thread.start()

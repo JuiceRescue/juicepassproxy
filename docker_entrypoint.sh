@@ -182,7 +182,7 @@ logger INFO "UPDATE_UDPC: ${UPDATE_UDPC}"
 if $UPDATE_UDPC; then
   logger INFO "JPP_HOST: ${JPP_HOST}"
   JPP_STRING+=" --juicebox_host ${JUICEBOX_HOST}"
-  JPP_STRING+=" --juicebox_proxy_host ${JPP_HOST}"
+  JPP_STRING+=" --juicepass_proxy_host ${JPP_HOST}"
   JPP_STRING+=" --update_udpc"
 fi
 
