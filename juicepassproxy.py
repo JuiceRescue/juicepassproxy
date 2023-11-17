@@ -265,7 +265,7 @@ class JuiceboxUDPCUpdater(object):
                             if self.udpc_host not in connection["dest"]:
                                 udpc_stream_to_update = int(connection["id"])
                     # logging.debug(f"udpc_streams_to_close: {udpc_streams_to_close}")
-                    if udpc_stream_to_update == 0:
+                    if udpc_stream_to_update == 0 and len(udpc_streams_to_close) > 0:
                         udpc_stream_to_update = int(max(udpc_streams_to_close, key=int))
                     logging.debug(f"Active UDPC Stream: {udpc_stream_to_update}")
 
