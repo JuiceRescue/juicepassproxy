@@ -254,25 +254,26 @@ class JuiceboxUDPCUpdater(object):
                 with JuiceboxTelnet(self.juicebox_host, 2000) as tn:
                     connections = tn.list()
                     update_required = True
+                    streams_to_close = []
                     connection_to_update = None
-                    id_to_update = None
 
                     for connection in connections:
                         if connection["type"] == "UDPC":
+                            streams_to_close.append(int(connection["id"]))
                             connection_to_update = connection
 
                     if connection_to_update is None:
                         logging.debug("UDPC IP not found, updating...")
-                    elif self.udpc_host not in connection["dest"]:
+                    elif self.udpc_host not in connection_to_update["dest"]:
                         logging.debug("UDPC IP incorrect, updating...")
-                        id_to_update = connection["id"]
-                    else:
+                    elif len(streams_to_close) == 1:
                         logging.debug("UDPC IP correct")
                         update_required = False
 
                     if update_required:
-                        if id_to_update is not None:
-                            tn.stream_close(id_to_update)
+                        for id in streams_to_close:
+                            logging.debug(f"Closing UDPC stream: {id}")
+                            tn.stream_close(id)
                         tn.udpc(self.udpc_host, self.udpc_port)
                         tn.save()
                         logging.debug("UDPC IP Saved")
