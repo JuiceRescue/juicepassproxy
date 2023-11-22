@@ -1,4 +1,4 @@
-CONF_YAML = "/config/juicepassproxy.yaml"
+CONF_YAML = "juicepassproxy.yaml"
 
 # Defaults
 DEFAULT_ENELX_SERVER = "juicenet-udp-prod3-usa.enelx.com"

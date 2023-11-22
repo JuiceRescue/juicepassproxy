@@ -143,6 +143,9 @@ options:
                         JuicePass Proxy. Optional: only necessary when using
                         --update_udpc and it will be inferred from the address
                         in --src if omitted.
+  --config_loc CONFIG_LOC
+                        The location to store the config file (default:
+                        /~/.juicepassproxy)
 ```
 
 _For **DST**, you should only use the IP address of the EnelX Server and **not** the fully qualified domain name (FQDN) to avoid DNS lookup loops._

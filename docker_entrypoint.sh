@@ -62,6 +62,7 @@ logger INFO "UPDATE_UDPC: ${UPDATE_UDPC}"
 if $UPDATE_UDPC; then
   JPP_STRING+=" --update_udpc"
 fi
+JPP_STRING+=" --config_loc /config"
 logger INFO "DEBUG: ${DEBUG}"
 if $DEBUG; then
   JPP_STRING+=" --debug"

@@ -5,6 +5,7 @@ import ipaddress
 import logging
 import socket
 import time
+from pathlib import Path
 from threading import Thread
 
 import yaml
@@ -200,6 +201,7 @@ class JuiceboxMessageHandler(object):
         message = {"type": "basic"}
         message["current"] = 0
         message["energy_session"] = 0
+        active = True
         for part in str(data).split(","):
             if part[0] == "S":
                 message["status"] = {
@@ -386,25 +388,25 @@ def get_juicebox_id(juicebox_host):
         return None
 
 
-def load_config():
+def load_config(config_loc):
     config = {}
     try:
-        with open(CONF_YAML, "r") as file:
+        with open(config_loc, "r") as file:
             config = yaml.safe_load(file)
-
     except Exception as e:
-        logging.warning(f"Can't load {CONF_YAML}: {e}")
+        logging.warning(f"Can't load {config_loc}: {e}")
+    if not config:
+        config = {}
     return config
 
 
-def write_config(config):
+def write_config(config, config_loc):
     try:
-        with open(CONF_YAML, "w") as file:
+        with open(config_loc, "w") as file:
             yaml.dump(config, file)
         return True
     except Exception as e:
-        logging.warning(f"Can't write to {CONF_YAML}: {e}")
-
+        logging.warning(f"Can't write to {config_loc}: {e}")
     return False
 
 
@@ -482,6 +484,12 @@ def main():
         " Proxy. Optional: only necessary when using --update_udpc and"
         " it will be inferred from the address in --src if omitted.",
     )
+    parser.add_argument(
+        "--config_loc",
+        type=str,
+        default=Path.home().joinpath(".juicepassproxy"),
+        help="The location to store the config file  (default: %(default)s)",
+    )
     args = parser.parse_args()
 
     if args.debug:
@@ -495,7 +503,13 @@ def main():
     if not args.dst and not args.juicebox_host:
         raise argparse.ArgumentError(arg_juicebox_host, "juicebox_host is required")
 
-    config = load_config()
+    config_loc = Path(args.config_loc)
+    config_loc.mkdir(parents=True, exist_ok=True)
+    config_loc = config_loc.joinpath(CONF_YAML)
+    config_loc.touch(exist_ok=True)
+    logging.info(f"config_loc: {config_loc}")
+    config = load_config(config_loc)
+
     if enelx_server_port := get_enelx_server_port(args.juicebox_host):
         logging.debug(f"enelx_server_port: {enelx_server_port}")
         enelx_server = enelx_server_port.split(":")[0]
@@ -553,7 +567,7 @@ def main():
         logging.error(
             "Cannot get JuiceBox ID from Telnet and not in Config. If a JuiceBox ID is later set or is obtained via Telnet, it will likely create a new JuiceBox Device with new Entities in Home Assistant."
         )
-    write_config(config)
+    write_config(config, config_loc)
 
     mqttsettings = Settings.MQTT(
         host=args.mqtt_host,
