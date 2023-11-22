@@ -183,6 +183,7 @@ class JuiceboxMessageHandler(object):
         message = {"type": "basic"}
         message["current"] = 0
         message["energy_session"] = 0
+        active = True
         for part in str(data).split(","):
             if part[0] == "S":
                 message["status"] = {
