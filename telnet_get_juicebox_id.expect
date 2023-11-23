@@ -1,9 +1,0 @@
-#!/usr/bin/expect
-
-set host [lindex $argv 0]
-
-set timeout 10
-spawn telnet $host 2000
-expect ">"
-send "get email.name_address\r"
-expect ">"

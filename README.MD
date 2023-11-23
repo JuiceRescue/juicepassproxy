@@ -30,7 +30,7 @@ _Hopefully we won't need this if EnelX fixes their API!_
     B. Set these Docker Environment Variables in your Docker Compose file:</br>
       ```
       UPDATE_UDPC=true
-      JUICEBOX_HOST=<IP address of your JuiceBox
+      JUICEBOX_HOST=<IP address of your JuiceBox>
       JPP_HOST=<IP address of the machine that the JuicePass Proxy Docker Container is running on>
       ```
 
@@ -83,19 +83,17 @@ services:
 Variable | Required | Description & Default |
 -- | -- | --
 **JUICEBOX_HOST** | **Recommended**</br></br>**Required if Update UDPC is True.** | If defined, it will attempt to get the EnelX Server and Port using Telnet. If unsuccessful, it will default to the EnelX Server and Port below.
+**UPDATE_UDPC** | No | Default: false. If true, will continually update the JuiceBox via telnet to point to JuicePass Proxy.
+**JPP_HOST**  | **Required if Update UDPC is True** |  This is the IP or Hostname of the machine where JuicePass Proxy is running (**not** the IP of the Docker Container)
 **SRC** | No | If not defined, it will attempt to get the Local Docker IP. If unsuccessful, it will default to 127.0.0.1.
 **DST** | No | If not defined, it will attempt to get the IP of the EnelX Server. If unsuccessful, it will default to 54.161.185.130. If manually defined, you should only use the IP address of the EnelX Server and not the fully qualified domain name to avoid DNS lookup loops.
 **JUICEBOX_ID**  | No | If not defined, it will attempt to get the JuiceBox ID using Telnet.  
-**ENELX_SERVER** | No | juicenet-udp-prod3-usa.enelx.com
-**ENELX_PORT** | No | 8047
 **MQTT_HOST** | No | 127.0.0.1
 **MQTT_PORT** | No | 1883
 **MQTT_USER** | No |
 **MQTT_PASS** | No |
 **MQTT_DISCOVERY_PREFIX** | No | homeassistant
 **DEVICE_NAME** | No | JuiceBox
-**UPDATE_UDPC** | No | Default: false. If true, will continually update the JuiceBox via telnet to point to JuicePass Proxy.
-**JPP_HOST**  | **Required if Update UDPC is True** |  This is the IP or Hostname of the machine where JuicePass Proxy is running (**not** the IP of the Docker Container)
 **DEBUG** | No | false
 
 
@@ -103,9 +101,9 @@ Variable | Required | Description & Default |
 <summary><h2>Manual Installation</h2></summary>
 
 1. Clone this repository
-2. Use Python 3.10+ (I recommend setting up a virtual environment)
+2. Use Python 3.10-3.12 (I recommend setting up a virtual environment)
 3. Install requirements `pip install -r requirements.txt`
-4. Launch by executing `python juicepassproxy.py --dst <enelx IP:port> --host <mqtthost>` (params documented below)
+4. Launch by executing `python3 juicepassproxy.py --juicebox_host <IP of the JuiceBox> --mqtt_host <mqtt_host>` (params documented below)
 5. Nothing happens!
 6. Configure your DNS server running on your network (like Pi-hole or your router) to route all DNS requests from EnelX to the machine running this proxy. For me this was `juicenet-udp-prod3-usa.enelx.com`. See below for instructions to determine that.
 7. Alternatively to #6, you can enable `update_udpc` on the command line and set `juicebox_host` and the application will force publish the IP in the `src` argument to the Juicebox and avoid the need to set DNS rules on your router or DNS server. **NOTE: if you need to publish a different IP than the one in the `src` argument, you can make use of the `--juicepass_proxy_host` arg.**
@@ -115,25 +113,39 @@ Variable | Required | Description & Default |
 ```
 options:
   -h, --help            show this help message and exit
-  -s SRC, --src SRC     Source IP and port, (default: 127.0.0.1:8047)
-  -d DST, --dst DST     Destination IP and port of EnelX Server.
+  -s SRC, --src SRC     Source IP (and optional port). If not defined, will
+                        obtain it automatically. (Ex. 127.0.0.1:8047)
+  -d DST, --dst DST     Destination IP (and optional port) of EnelX Server. If
+                        not defined, --juicebox_host required and then will
+                        obtain it automatically. (Ex. 127.0.0.1:8047)
   --debug
-  -u USER, --user USER  MQTT username
-  -P PASSWORD, --password PASSWORD
-                        MQTT password
-  -H HOST, --host HOST  MQTT hostname to connect to (default: 127.0.0.1)
-  -p PORT, --port PORT  MQTT port (default: 1883)
-  -D DISCOVERY_PREFIX, --discovery-prefix DISCOVERY_PREFIX
-                        Home Assistant MQTT topic prefix (default: homeassistant)
-  --name DEVICE_NAME    Home Assistant Device Name (default: Juicebox)
+  -u MQTT_USER, --mqtt_user MQTT_USER
+                        MQTT Username
+  -P MQTT_PASSWORD, --mqtt_password MQTT_PASSWORD
+                        MQTT Password
+  -H MQTT_HOST, --mqtt_host MQTT_HOST
+                        MQTT Hostname to connect to (default: 127.0.0.1)
+  -p MQTT_PORT, --mqtt_port MQTT_PORT
+                        MQTT Port (default: 1883)
+  -D MQTT_DISCOVERY_PREFIX, --mqtt_discovery_prefix MQTT_DISCOVERY_PREFIX
+                        Home Assistant MQTT topic prefix (default:
+                        homeassistant)
+  --name DEVICE_NAME    Home Assistant Device Name (default: JuiceBox)
   --juicebox_id JUICEBOX_ID
-                        JuiceBox ID
+                        JuiceBox ID. If not defined, will obtain it
+                        automatically.
   --update_udpc         Update UDPC on the JuiceBox. Requires --juicebox_host
   --juicebox_host JUICEBOX_HOST
-                        host or IP address of the Juicebox. required for --update_udpc
+                        Host or IP address of the JuiceBox. Required for
+                        --update_udpc or if --dst not defined.
   --juicepass_proxy_host JUICEPASS_PROXY_HOST
-                        EXTERNAL host or IP address of the machine running Juicepass Proxy. Optional: only necessary when using --update_udpc and it will be inferred from the address in --src if
-                        omitted.
+                        EXTERNAL host or IP address of the machine running
+                        JuicePass Proxy. Optional: only necessary when using
+                        --update_udpc and it will be inferred from the address
+                        in --src if omitted.
+  --config_loc CONFIG_LOC
+                        The location to store the config file (default:
+                        /~/.juicepassproxy)
 ```
 
 _For **DST**, you should only use the IP address of the EnelX Server and **not** the fully qualified domain name (FQDN) to avoid DNS lookup loops._

@@ -1,9 +1,27 @@
+#!/usr/bin/env python3
+
 import argparse
+import ipaddress
 import logging
 import re
+import socket
 import time
+from pathlib import Path
 from threading import Thread
 
+import yaml
+from const import (
+    CONF_YAML,
+    DEFAULT_DEVICE_NAME,
+    DEFAULT_DST,
+    DEFAULT_ENELX_PORT,
+    DEFAULT_ENELX_SERVER,
+    DEFAULT_MQTT_DISCOVERY_PREFIX,
+    DEFAULT_MQTT_HOST,
+    DEFAULT_MQTT_PORT,
+    DEFAULT_SRC,
+)
+from dns import resolver
 from ha_mqtt_discoverable import DeviceInfo, Settings
 from ha_mqtt_discoverable.sensors import Sensor, SensorInfo
 from juicebox_telnet import JuiceboxTelnet
@@ -233,7 +251,7 @@ class JuiceboxMessageHandler(object):
                 if entity:
                     entity.set_state(message.get(k))
         except Exception as e:
-            logging.exception(f"failed to publish sensor data: {e}")
+            logging.exception(f"Failed to publish sensor data to MQTT: {e}")
 
     def remote_data_handler(self, data):
         logging.debug("remote: {}".format(data))
@@ -313,6 +331,93 @@ class JuiceboxUDPCUpdater(object):
             time.sleep(interval)
 
 
+def get_local_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(0)
+    try:
+        s.connect(("10.254.254.254", 1))
+        local_ip = s.getsockname()[0]
+    except Exception:
+        local_ip = None
+    s.close()
+    return local_ip
+
+
+def resolve_ip_external_dns(address, dns="1.1.1.1"):
+    res = resolver.Resolver()
+    res.nameservers = [dns]
+
+    answers = res.resolve(address)
+
+    if len(answers) > 0:
+        return answers[0].address
+    return None
+
+
+def is_valid_ip(test_ip):
+    try:
+        ipaddress.ip_address(test_ip)
+    except Exception:
+        return False
+    return True
+
+
+def get_enelx_server_port(juicebox_host):
+    try:
+        with JuiceboxTelnet(juicebox_host) as tn:
+            connections = tn.list()
+            # logging.debug(f"connections: {connections}")
+            for connection in connections:
+                if connection["type"] == "UDPC" and not is_valid_ip(
+                    connection["dest"].split(":")[0]
+                ):
+                    return connection["dest"]
+        return None
+
+    except Exception as e:
+        logging.warning(f"Error in getting EnelX Server and Port via Telnet: {e}")
+        return None
+
+
+def get_juicebox_id(juicebox_host):
+    try:
+        with JuiceboxTelnet(juicebox_host) as tn:
+            return (
+                tn.get("email.name_address")
+                .get("email.name_address")
+                .replace("b'", "")
+                .replace("'", "")
+            )
+
+        return None
+
+    except Exception as e:
+        logging.warning(f"Error in getting JuiceBox ID via Telnet: {e}")
+        return None
+
+
+def load_config(config_loc):
+    config = {}
+    try:
+        with open(config_loc, "r") as file:
+            config = yaml.safe_load(file)
+    except Exception as e:
+        logging.warning(f"Can't load {config_loc}: {e}")
+    if not config:
+        config = {}
+    return config
+
+
+def write_config(config, config_loc):
+    try:
+        with open(config_loc, "w") as file:
+            yaml.dump(config, file)
+        return True
+    except Exception as e:
+        logging.warning(f"Can't write to {config_loc}: {e}")
+    return False
+
+
 def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter, description=AP_DESCRIPTION
@@ -321,43 +426,54 @@ def main():
     arg_src = parser.add_argument(
         "-s",
         "--src",
-        required=True,
-        default="127.0.0.1:8047",
-        help="Source IP and port, (default: %(default)s)",
+        required=False,
+        type=str,
+        help="Source IP (and optional port). If not defined, will obtain it automatically. (Ex. 127.0.0.1:8047)",
     )
     parser.add_argument(
-        "-d", "--dst", required=True, help="Destination IP and port of EnelX Server."
+        "-d",
+        "--dst",
+        required=False,
+        type=str,
+        help="Destination IP (and optional port) of EnelX Server. If not defined, --juicebox_host required and then will obtain it automatically. (Ex. 127.0.0.1:8047)",
     )
     parser.add_argument("--debug", action="store_true")
-    parser.add_argument("-u", "--user", type=str, help="MQTT username")
-    parser.add_argument("-P", "--password", type=str, help="MQTT password")
+    parser.add_argument("-u", "--mqtt_user", type=str, help="MQTT Username")
+    parser.add_argument("-P", "--mqtt_password", type=str, help="MQTT Password")
     parser.add_argument(
         "-H",
-        "--host",
+        "--mqtt_host",
         type=str,
-        default="127.0.0.1",
-        help="MQTT hostname to connect to (default: %(default)s)",
+        default=DEFAULT_MQTT_HOST,
+        help="MQTT Hostname to connect to (default: %(default)s)",
     )
     parser.add_argument(
-        "-p", "--port", type=int, default=1883, help="MQTT port (default: %(default)s)"
+        "-p",
+        "--mqtt_port",
+        type=int,
+        default=DEFAULT_MQTT_PORT,
+        help="MQTT Port (default: %(default)s)",
     )
     parser.add_argument(
         "-D",
-        "--discovery-prefix",
+        "--mqtt_discovery_prefix",
         type=str,
-        dest="discovery_prefix",
-        default="homeassistant",
+        dest="mqtt_discovery_prefix",
+        default=DEFAULT_MQTT_DISCOVERY_PREFIX,
         help="Home Assistant MQTT topic prefix (default: %(default)s)",
     )
     parser.add_argument(
         "--name",
         type=str,
-        default="Juicebox",
+        default=DEFAULT_DEVICE_NAME,
         help="Home Assistant Device Name (default: %(default)s)",
         dest="device_name",
     )
     parser.add_argument(
-        "--juicebox_id", type=str, help="JuiceBox ID", dest="juicebox_id"
+        "--juicebox_id",
+        type=str,
+        help="JuiceBox ID. If not defined, will obtain it automatically.",
+        dest="juicebox_id",
     )
     parser.add_argument(
         "--update_udpc",
@@ -367,7 +483,7 @@ def main():
     arg_juicebox_host = parser.add_argument(
         "--juicebox_host",
         type=str,
-        help="Host or IP address of the JuiceBox. required for --update_udpc",
+        help="Host or IP address of the JuiceBox. Required for --update_udpc or if --dst not defined.",
     )
     parser.add_argument(
         "--juicepass_proxy_host",
@@ -376,15 +492,57 @@ def main():
         " Proxy. Optional: only necessary when using --update_udpc and"
         " it will be inferred from the address in --src if omitted.",
     )
+    parser.add_argument(
+        "--config_loc",
+        type=str,
+        default=Path.home().joinpath(".juicepassproxy"),
+        help="The location to store the config file  (default: %(default)s)",
+    )
     args = parser.parse_args()
 
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
+    else:
+        logging.getLogger().setLevel(logging.INFO)
 
     if args.update_udpc and not args.juicebox_host:
         raise argparse.ArgumentError(arg_juicebox_host, "juicebox_host is required")
 
-    localhost_src = args.src.startswith("0.") or args.src.startswith("127")
+    if not args.dst and not args.juicebox_host:
+        raise argparse.ArgumentError(arg_juicebox_host, "juicebox_host is required")
+
+    config_loc = Path(args.config_loc)
+    config_loc.mkdir(parents=True, exist_ok=True)
+    config_loc = config_loc.joinpath(CONF_YAML)
+    config_loc.touch(exist_ok=True)
+    logging.info(f"config_loc: {config_loc}")
+    config = load_config(config_loc)
+
+    if enelx_server_port := get_enelx_server_port(args.juicebox_host):
+        logging.debug(f"enelx_server_port: {enelx_server_port}")
+        enelx_server = enelx_server_port.split(":")[0]
+        enelx_port = enelx_server_port.split(":")[1]
+    else:
+        enelx_server = config.get("ENELX_SERVER", DEFAULT_ENELX_SERVER)
+        enelx_port = config.get("ENELX_PORT", DEFAULT_ENELX_PORT)
+    config.update({"ENELX_SERVER": enelx_server})
+    config.update({"ENELX_PORT": enelx_port})
+    logging.info(f"enelx_server: {enelx_server}")
+    logging.info(f"enelx_port: {enelx_port}")
+
+    if args.src:
+        if ":" in args.src:
+            src = args.src
+        else:
+            src = f"{args.src}:{enelx_port}"
+    elif local_ip := get_local_ip():
+        src = f"{local_ip}:{enelx_port}"
+    else:
+        src = f"{config.get('SRC',DEFAULT_SRC)}:{enelx_port}"
+    config.update({"SRC": src.split(":")[0]})
+    logging.info(f"src: {src}")
+
+    localhost_src = src.startswith("0.") or src.startswith("127")
     if args.update_udpc and localhost_src and not args.juicepass_proxy_host:
         raise argparse.ArgumentError(
             arg_src,
@@ -392,17 +550,44 @@ def main():
             " --juicepass_proxy_host must be used.",
         )
 
+    if args.dst:
+        if ":" in args.dst:
+            dst = args.dst
+        else:
+            dst = f"{args.dst}:{enelx_port}"
+    elif enelx_server_ip := resolve_ip_external_dns(enelx_server):
+        dst = f"{enelx_server_ip}:{enelx_port}"
+    else:
+        dst = f"{config.get('DST', DEFAULT_DST)}:{enelx_port}"
+    config.update({"DST": dst.split(":")[0]})
+    logging.info(f"dst: {dst}")
+
+    if juicebox_id := args.juicebox_id:
+        pass
+    elif juicebox_id := get_juicebox_id(args.juicebox_host):
+        pass
+    else:
+        juicebox_id = config.get("JUICEBOX_ID")
+    if juicebox_id:
+        config.update({"JUICEBOX_ID": juicebox_id})
+        logging.info(f"juicebox_id: {juicebox_id}")
+    else:
+        logging.error(
+            "Cannot get JuiceBox ID from Telnet and not in Config. If a JuiceBox ID is later set or is obtained via Telnet, it will likely create a new JuiceBox Device with new Entities in Home Assistant."
+        )
+    write_config(config, config_loc)
+
     mqttsettings = Settings.MQTT(
-        host=args.host,
-        port=args.port,
-        username=args.user,
-        password=args.password,
-        discovery_prefix=args.discovery_prefix,
+        host=args.mqtt_host,
+        port=args.mqtt_port,
+        username=args.mqtt_user,
+        password=args.mqtt_password,
+        discovery_prefix=args.mqtt_discovery_prefix,
     )
     handler = JuiceboxMessageHandler(
         mqtt_settings=mqttsettings,
         device_name=args.device_name,
-        juicebox_id=args.juicebox_id,
+        juicebox_id=juicebox_id,
     )
 
     pyproxy.LOCAL_DATA_HANDLER = handler.local_data_handler
@@ -412,13 +597,13 @@ def main():
     udpc_updater = None
 
     if args.update_udpc:
-        address = args.src.split(":")
+        address = src.split(":")
         jpp_host = args.juicepass_proxy_host or address[0]
         udpc_updater = JuiceboxUDPCUpdater(args.juicebox_host, jpp_host, address[1])
         udpc_updater_thread = Thread(target=udpc_updater.start)
         udpc_updater_thread.start()
 
-    pyproxy.udp_proxy(args.src, args.dst)
+    pyproxy.udp_proxy(src, dst)
 
     if udpc_updater is not None and udpc_updater_thread is not None:
         udpc_updater.run_event = False
