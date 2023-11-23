@@ -11,6 +11,6 @@ RUN apt-get update && apt-get upgrade -y
 RUN apt-get install -y git curl
 RUN git clone https://github.com/snicker/juicepassproxy.git /juicepassproxy
 RUN pip install --no-cache-dir -r /juicepassproxy/requirements.txt
-RUN chmod +x /juicepassproxy/*.sh /juicepassproxy/*.expect
+RUN chmod -f +x /juicepassproxy/*.sh
 
 ENTRYPOINT /juicepassproxy/docker_entrypoint.sh
