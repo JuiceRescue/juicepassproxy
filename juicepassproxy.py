@@ -3,6 +3,7 @@
 import argparse
 import ipaddress
 import logging
+import re
 import socket
 import time
 from pathlib import Path
@@ -202,7 +203,14 @@ class JuiceboxMessageHandler(object):
         message["current"] = 0
         message["energy_session"] = 0
         active = True
-        for part in str(data).split(","):
+        parts = re.split(r",|!|:", str(data).replace("b'", "").replace("'", ""))
+        parts.pop(0)  # JuiceBox ID
+        parts.pop(-1)  # Ending blank
+        parts.pop(-1)  # Checksum
+
+        # Undefined parts: v, F, u, M, C, m, t, i, e, r, b, B, P, p
+        # s = Counter
+        for part in parts:
             if part[0] == "S":
                 message["status"] = {
                     "S0": "Unplugged",
