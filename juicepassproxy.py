@@ -64,6 +64,7 @@ class JuiceboxMessageHandler(object):
             "temperature": None,
             "voltage": None,
             "power": None,
+            "debug_message": None,
         }
         self._init_devices()
 
@@ -90,15 +91,34 @@ class JuiceboxMessageHandler(object):
         self._init_device_temperature(device_info)
         self._init_device_voltage(device_info)
         self._init_device_power(device_info)
+        self._init_debug_message(device_info)
 
     def _init_device_status(self, device_info):
         name = "Status"
         sensor_info = SensorInfo(
-            name=name, unique_id=f"{self.juicebox_id} {name}", device=device_info
+            name=name,
+            unique_id=f"{self.juicebox_id} {name}",
+            icon="mdi:ev-station",
+            device=device_info,
         )
         settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
         sensor = Sensor(settings)
         self.entities["status"] = sensor
+
+    def _init_debug_message(self, device_info):
+        name = "Last Debug Message"
+        sensor_info = SensorInfo(
+            name=name,
+            unique_id=f"{self.juicebox_id} {name}",
+            expire_after=60,
+            enabled_by_default=False,
+            icon="mdi:bug",
+            entity_category="diagnostic",
+            device=device_info,
+        )
+        settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
+        sensor = Sensor(settings)
+        self.entities["debug_message"] = sensor
 
     def _init_device_current(self, device_info):
         name = "Current"
@@ -240,11 +260,33 @@ class JuiceboxMessageHandler(object):
         message["power"] = round(
             message.get("voltage", 0) * message.get("current", 0), 2
         )
-        logging.debug(f"message: {message}")
+        return message
+
+    def debug_message_try_parse(self, data):
+        message = {"type": "debug"}
+        dbg_data = (
+            str(data)
+            .replace("https://", "https//")
+            .replace("http://", "http//")
+            .split(":")
+        )
+        dbg_level_abbr = dbg_data[1].split(",")[1]
+        if dbg_level_abbr == "NFO":
+            dbg_level = "INFO"
+        elif dbg_level_abbr == "WRN":
+            dbg_level = "WARNING"
+        elif dbg_level_abbr == "ERR":
+            dbg_level = "ERROR"
+        else:
+            dbg_level = dbg_level_abbr
+        dbg_msg = (
+            dbg_data[2].replace("https//", "https://").replace("http//", "http://")
+        )
+        message["debug_message"] = f"{dbg_level}: {dbg_msg}"
         return message
 
     def basic_message_publish(self, message):
-        logging.debug("basic message {}".format(message))
+        logging.debug(f"{message.get('type')} message: {message}")
         try:
             for k in message:
                 entity = self.entities.get(k)
@@ -258,8 +300,11 @@ class JuiceboxMessageHandler(object):
         return data
 
     def local_data_handler(self, data):
-        logging.debug("local : {}".format(data))
-        message = self.basic_message_try_parse(data)
+        logging.debug("local: {}".format(data))
+        if ":DBG," in str(data):
+            message = self.debug_message_try_parse(data)
+        else:
+            message = self.basic_message_try_parse(data)
         if message:
             self.basic_message_publish(message)
         return data
@@ -589,7 +634,9 @@ def main():
         device_name=args.device_name,
         juicebox_id=juicebox_id,
     )
-
+    handler.basic_message_publish(
+        {"type": "debug", "debug_message": "INFO: Starting JuicePass Proxy"}
+    )
     pyproxy.LOCAL_DATA_HANDLER = handler.local_data_handler
     pyproxy.REMOTE_DATA_HANDLER = handler.remote_data_handler
 
