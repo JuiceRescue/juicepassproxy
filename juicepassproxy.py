@@ -311,32 +311,33 @@ class JuiceboxMessageHandler(object):
 
 
 class JuiceboxUDPCUpdater(object):
-    def __init__(self, juicebox_host, udpc_host, udpc_port=8047):
+    def __init__(self, juicebox_host, udpc_host, udpc_port=8047, timeout=None):
         self.juicebox_host = juicebox_host
         self.udpc_host = udpc_host
         self.udpc_port = udpc_port
         self.interval = 30
         self.run_event = True
+        self.timeout = timeout
 
     def start(self):
         while self.run_event:
             interval = self.interval
             try:
-                logging.debug("JuiceboxUDPCUpdater check...")
-                with JuiceboxTelnet(self.juicebox_host, 2000) as tn:
+                logging.debug("JuiceboxUDPCUpdater check... ")
+                with JuiceboxTelnet(self.juicebox_host, 2000, self.timeout) as tn:
                     connections = tn.list()
                     update_required = True
                     udpc_streams_to_close = {}  # Key = Connection id, Value = list id
                     udpc_stream_to_update = 0
 
-                    # logging.debug(f"connections: {connections}")
+                    logging.debug(f"connections: {connections}")
 
                     for i, connection in enumerate(connections):
                         if connection["type"] == "UDPC":
                             udpc_streams_to_close.update({int(connection["id"]): i})
                             if self.udpc_host not in connection["dest"]:
                                 udpc_stream_to_update = int(connection["id"])
-                    # logging.debug(f"udpc_streams_to_close: {udpc_streams_to_close}")
+                    logging.debug(f"udpc_streams_to_close: {udpc_streams_to_close}")
                     if udpc_stream_to_update == 0 and len(udpc_streams_to_close) > 0:
                         udpc_stream_to_update = int(max(udpc_streams_to_close, key=int))
                     logging.debug(f"Active UDPC Stream: {udpc_stream_to_update}")
@@ -525,6 +526,12 @@ def main():
         action="store_true",
         help="Update UDPC on the JuiceBox. Requires --juicebox_host",
     )
+    parser.add_argument(
+        "--udpc_timeout",
+        type=int,
+        default=0,
+        help="Timeout setting for UDPC Updater",
+    )
     arg_juicebox_host = parser.add_argument(
         "--juicebox_host",
         type=str,
@@ -646,7 +653,11 @@ def main():
     if args.update_udpc:
         address = src.split(":")
         jpp_host = args.juicepass_proxy_host or address[0]
-        udpc_updater = JuiceboxUDPCUpdater(args.juicebox_host, jpp_host, address[1])
+        udpc_timeout = int(args.udpc_timeout)
+        logging.debug(f"udpc timeout: {udpc_timeout}")
+        if (udpc_timeout == 0):
+            udpc_timeout = None
+        udpc_updater = JuiceboxUDPCUpdater(args.juicebox_host, jpp_host, address[1], udpc_timeout)
         udpc_updater_thread = Thread(target=udpc_updater.start)
         udpc_updater_thread.start()
 
