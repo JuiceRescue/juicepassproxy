@@ -20,6 +20,9 @@ from const import (
     DEFAULT_MQTT_HOST,
     DEFAULT_MQTT_PORT,
     DEFAULT_SRC,
+    DEFAULT_MAX_CURRENT,
+    DEFAULT_ADD_STATUS_ATTRIBUTES,
+    DEFAULT_IGNORE_REMOTE
 )
 from dns import resolver
 from ha_mqtt_discoverable import DeviceInfo, Settings
@@ -51,8 +54,6 @@ avoid nameserver lookup loops.
 """
 
 
-# TODO configurable or Number definition must be done after receiving the value from the device
-default_max_current = 32
 
 
 def current_max_callback(client: Client, juicebox_handler, message: MQTTMessage):
@@ -65,10 +66,13 @@ def current_max_charging_callback(client: Client, juicebox_handler, message: MQT
 
 
 class JuiceboxMessageHandler(object):
-    def __init__(self, device_name, mqtt_settings, juicebox_id=None):
+
+    def __init__(self, device_name, mqtt_settings, juicebox_id=None, max_current=DEFAULT_MAX_CURRENT, add_status_attributes=DEFAULT_ADD_STATUS_ATTRIBUTES):
         self.mqtt_settings = mqtt_settings
         self.device_name = device_name
         self.juicebox_id = juicebox_id
+        self.max_current = max_current
+        self.add_status_attributes = add_status_attributes
         self.entities = {
             "status": None,
             "current": None,
@@ -177,7 +181,7 @@ class JuiceboxMessageHandler(object):
             device_class="current",
             unit_of_measurement="A",
             device=device_info,
-            max=default_max_current, # Should be the Current Rating
+            max=self.max_current, 
         )
         settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
         sensor = Number(settings, current_max_callback, self)
@@ -192,7 +196,7 @@ class JuiceboxMessageHandler(object):
             device_class="current",
             unit_of_measurement="A",
             device=device_info,
-            max=default_max_current, # Should be the Current Rating
+            max=self.max_current, 
         )
         settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
         sensor = Number(settings, current_max_charging_callback, self)
@@ -346,10 +350,20 @@ class JuiceboxMessageHandler(object):
                 message["protocol_version"] = part.split("v")[1]
             elif part[0] == "E" and active:
                 message["energy_session"] = float(part.split("E")[1])
+            elif part[0] == "t":
+                message["report_time"] = part.split("t")[1]
+            elif part[0] == "v":
+                message["protocol_version"] = part.split("v")[1]
+            elif part[0] == "i":
+                message["interval"] = part.split("i")[1]
+            elif part[0] == "u":
+                message["loop_counter"] = part.split("u")[1]
             elif part[0] == "T":
                 message["temperature"] = round(float(part.split("T")[1]) * 1.8 + 32, 2)
             elif part[0] == "V":
                 message["voltage"] = round(float(part.split("V")[1]) * 0.1, 2)
+            else:
+                message["unknown_" + part[0]] = part
         message["power"] = round(
             message.get("voltage", 0) * message.get("current", 0), 2
         )
@@ -381,6 +395,7 @@ class JuiceboxMessageHandler(object):
     def basic_message_publish(self, message):
         logging.debug(f"{message.get('type')} message: {message}")
         try:
+            attributes = {}
             for k in message:
                 entity = self.entities.get(k)
                 if entity:
@@ -388,12 +403,20 @@ class JuiceboxMessageHandler(object):
                         entity.set_value(message.get(k))
                     else:
                         entity.set_state(message.get(k))
+                else:
+                   attributes[k] = message.get(k)
+            if self.add_status_attributes:
+                self.entities.get("status").set_attributes(attributes)
         except Exception as e:
             logging.exception(f"Failed to publish sensor data to MQTT: {e}")
 
     def remote_data_handler(self, data):
         logging.debug("remote: {}".format(data))
         return data
+
+    def remote_ignore_data_handler(self, data):
+        logging.debug("remote: {}".format(data))
+        return "".encode()
 
     def local_data_handler(self, data):
         logging.debug("local: {}".format(data))
@@ -579,6 +602,7 @@ def main():
         help="Destination IP (and optional port) of EnelX Server. If not defined, --juicebox_host required and then will obtain it automatically. (Ex. 127.0.0.1:8047)",
     )
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--ignore-remote", action="store_true")
     parser.add_argument("-u", "--mqtt_user", type=str, help="MQTT Username")
     parser.add_argument("-P", "--mqtt_password", type=str, help="MQTT Password")
     parser.add_argument(
@@ -671,6 +695,7 @@ def main():
     logging.info(f"enelx_server: {enelx_server}")
     logging.info(f"enelx_port: {enelx_port}")
 
+
     if args.src:
         if ":" in args.src:
             src = args.src
@@ -703,6 +728,7 @@ def main():
     config.update({"DST": dst.split(":")[0]})
     logging.info(f"dst: {dst}")
 
+
     if juicebox_id := args.juicebox_id:
         pass
     elif juicebox_id := get_juicebox_id(args.juicebox_host):
@@ -716,6 +742,16 @@ def main():
         logging.error(
             "Cannot get JuiceBox ID from Telnet and not in Config. If a JuiceBox ID is later set or is obtained via Telnet, it will likely create a new JuiceBox Device with new Entities in Home Assistant."
         )
+    
+    max_current = config.get("MAX_CURRENT", DEFAULT_MAX_CURRENT)
+    logging.info(f"max_current: {max_current}")
+
+    add_status_attributes = str(config.get("ADD_STATUS_ATTRIBUTES", DEFAULT_ADD_STATUS_ATTRIBUTES)).lower() == "true"
+    logging.info(f"add_status_attributes: {add_status_attributes}")
+    
+    ignore_remote = args.ignore_remote or str(config.get("IGNORE_REMOTE", DEFAULT_IGNORE_REMOTE)).lower() == "true"
+    logging.info(f"ignore_remote: {ignore_remote}")
+
     write_config(config, config_loc)
 
     mqttsettings = Settings.MQTT(
@@ -729,12 +765,20 @@ def main():
         mqtt_settings=mqttsettings,
         device_name=args.device_name,
         juicebox_id=juicebox_id,
+        max_current=max_current,
+        add_status_attributes=add_status_attributes,
     )
     handler.basic_message_publish(
         {"type": "debug", "debug_message": "INFO: Starting JuicePass Proxy"}
     )
+
+
     pyproxy.LOCAL_DATA_HANDLER = handler.local_data_handler
-    pyproxy.REMOTE_DATA_HANDLER = handler.remote_data_handler
+    if ignore_remote:
+        logging.info("Ignoring remote messages")
+        pyproxy.REMOTE_DATA_HANDLER = handler.remote_ignore_data_handler
+    else:
+        pyproxy.REMOTE_DATA_HANDLER = handler.remote_data_handler
 
     udpc_updater_thread = None
     udpc_updater = None
