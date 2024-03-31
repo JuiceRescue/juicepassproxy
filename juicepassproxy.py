@@ -23,7 +23,8 @@ from const import (
 )
 from dns import resolver
 from ha_mqtt_discoverable import DeviceInfo, Settings
-from ha_mqtt_discoverable.sensors import Sensor, SensorInfo
+from ha_mqtt_discoverable.sensors import Sensor, SensorInfo, Number, NumberInfo
+from paho.mqtt.client import Client, MQTTMessage
 from juicebox_telnet import JuiceboxTelnet
 from pyproxy import pyproxy
 
@@ -50,6 +51,19 @@ avoid nameserver lookup loops.
 """
 
 
+# TODO configurable or Number definition must be done after receiving the value from the device
+default_max_current = 32
+
+
+def current_max_callback(client: Client, juicebox_handler, message: MQTTMessage):
+    juicebox_handler.update_current_number("current_max", int(message.payload.decode()) )
+
+
+def current_max_charging_callback(client: Client, juicebox_handler, message: MQTTMessage):
+    juicebox_handler.update_current_number("current_max_charging", int(message.payload.decode()) )
+
+
+
 class JuiceboxMessageHandler(object):
     def __init__(self, device_name, mqtt_settings, juicebox_id=None):
         self.mqtt_settings = mqtt_settings
@@ -58,6 +72,9 @@ class JuiceboxMessageHandler(object):
         self.entities = {
             "status": None,
             "current": None,
+            "current_rating": None,
+            "current_max": None,
+            "current_max_charging": None,
             "frequency": None,
             "energy_lifetime": None,
             "energy_session": None,
@@ -85,6 +102,9 @@ class JuiceboxMessageHandler(object):
         )
         self._init_device_status(device_info)
         self._init_device_current(device_info)
+        self._init_device_current_rating(device_info)
+        self._init_device_current_max(device_info)
+        self._init_device_current_max_charging(device_info)
         self._init_device_frequency(device_info)
         self._init_device_energy_lifetime(device_info)
         self._init_device_energy_session(device_info)
@@ -133,6 +153,50 @@ class JuiceboxMessageHandler(object):
         settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
         sensor = Sensor(settings)
         self.entities["current"] = sensor
+
+    def _init_device_current_rating(self, device_info):
+        name = "Current Rating"
+        sensor_info = SensorInfo(
+            name=name,
+            unique_id=f"{self.juicebox_id} {name}",
+            state_class="measurement",
+            device_class="current",
+            unit_of_measurement="A",
+            device=device_info,
+        )
+        settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
+        sensor = Sensor(settings)
+        self.entities["current_rating"] = sensor
+
+    def _init_device_current_max(self, device_info):
+        name = "Max Current"
+        sensor_info = NumberInfo(
+            name=name,
+            unique_id=f"{self.juicebox_id} {name}",
+            state_class="measurement",
+            device_class="current",
+            unit_of_measurement="A",
+            device=device_info,
+            max=default_max_current, # Should be the Current Rating
+        )
+        settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
+        sensor = Number(settings, current_max_callback, self)
+        self.entities["current_max"] = sensor
+
+    def _init_device_current_max_charging(self, device_info):
+        name = "Max Charging Current"
+        sensor_info = NumberInfo(
+            name=name,
+            unique_id=f"{self.juicebox_id} {name}",
+            state_class="measurement",
+            device_class="current",
+            unit_of_measurement="A",
+            device=device_info,
+            max=default_max_current, # Should be the Current Rating
+        )
+        settings = Settings(mqtt=self.mqtt_settings, entity=sensor_info)
+        sensor = Number(settings, current_max_charging_callback, self)
+        self.entities["current_max_charging"] = sensor
 
     def _init_device_frequency(self, device_info):
         name = "Frequency"
@@ -218,9 +282,21 @@ class JuiceboxMessageHandler(object):
         sensor = Sensor(settings)
         self.entities["power"] = sensor
 
+    def update_current_number(self, entity, value):
+        #TODO check the Current Rating         
+        self.update_number(entity, value)
+        
+    def update_number(self, entity, value):
+        logging.info(f"Received  {entity} {value} from HA")
+        # todo: send command to juicebox
+        # dont use set_value here, in next report the value will be updated and HA will receive the update...
+        
     def basic_message_try_parse(self, data):
         message = {"type": "basic"}
         message["current"] = 0
+        message["current_max"] = 0
+        message["current_max_charging"] = 0
+        message["current_rating"] = 0
         message["energy_session"] = 0
         active = True
         parts = re.split(r",|!|:", str(data).replace("b'", "").replace("'", ""))
@@ -228,8 +304,17 @@ class JuiceboxMessageHandler(object):
         parts.pop(-1)  # Ending blank
         parts.pop(-1)  # Checksum
 
-        # Undefined parts: v, F, u, M, C, m, t, i, e, r, b, B, P, p
+        # https://github.com/snicker/juicepassproxy/issues/52
+        # Undefined parts: F, e, r, b, B, P, p
         # s = Counter
+        # v = version of protocol
+        # i = Interval number. It contains a 96-slot interval memory (15-minute x 24-hour cycle) and 
+        #   this tells you how much energy was consumed in the rolling window as it reports one past 
+        #   (or current, if it's reporting the "right-now" interval) interval per message.
+        #   The letter after "i" = the energy in that interval (usually 0 if you're not charging basically 24/7)
+        # t - probably the report time in seconds - "every 9 seconds" (or may end up being 10). 
+        #   It can change its reporting interval if the bit mask in the reply command indicates that it should send reports faster (yet to be determined).
+        # u - loop counter
         for part in parts:
             if part[0] == "S":
                 message["status"] = {
@@ -247,10 +332,18 @@ class JuiceboxMessageHandler(object):
                 active = message["status"].lower() == "charging"
             elif part[0] == "A" and active:
                 message["current"] = round(float(part.split("A")[1]) * 0.1, 2)
+            elif part[0] == "m":
+                message["current_rating"] = float(part.split("m")[1])
+            elif part[0] == "M":
+                message["current_max"] = float(part.split("M")[1])
+            elif part[0] == "C":
+                message["current_max_charging"] = float(part.split("C")[1])
             elif part[0] == "f":
                 message["frequency"] = round(float(part.split("f")[1]) * 0.01, 2)
             elif part[0] == "L":
                 message["energy_lifetime"] = float(part.split("L")[1])
+            elif part[0] == "v":
+                message["protocol_version"] = part.split("v")[1]
             elif part[0] == "E" and active:
                 message["energy_session"] = float(part.split("E")[1])
             elif part[0] == "T":
@@ -291,7 +384,10 @@ class JuiceboxMessageHandler(object):
             for k in message:
                 entity = self.entities.get(k)
                 if entity:
-                    entity.set_state(message.get(k))
+                    if isinstance(entity,Number):
+                        entity.set_value(message.get(k))
+                    else:
+                        entity.set_state(message.get(k))
         except Exception as e:
             logging.exception(f"Failed to publish sensor data to MQTT: {e}")
 
