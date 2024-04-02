@@ -296,18 +296,34 @@ class JuiceboxMessageHandler(object):
             logging.exception(f"Failed to publish sensor data to MQTT: {e}")
 
     def remote_data_handler(self, data):
-        logging.debug("remote: {}".format(data))
-        return data
+        try:
+            logging.debug("remote: {}".format(data))
+            return data
+        except IndexError as e:
+            logging.warning(
+                    "Index error when handling remote data, probably wrong number of items in list"
+                    f"- nothing to worry about unless this happens a lot. ({e})"
+                )
+        except Exception as e:
+            logging.exception(f"Exception handling local data: {e}")
 
     def local_data_handler(self, data):
-        logging.debug("local: {}".format(data))
-        if ":DBG," in str(data):
-            message = self.debug_message_try_parse(data)
-        else:
-            message = self.basic_message_try_parse(data)
-        if message:
-            self.basic_message_publish(message)
-        return data
+        try:
+            logging.debug("local: {}".format(data))
+            if ":DBG," in str(data):
+                message = self.debug_message_try_parse(data)
+            else:
+                message = self.basic_message_try_parse(data)
+            if message:
+                self.basic_message_publish(message)
+            return data
+        except IndexError as e:
+            logging.warning(
+                    "Index error when handling local data, probably wrong number of items in list"
+                    f"- nothing to worry about unless this happens a lot. ({e})"
+                )
+        except Exception as e:
+            logging.exception(f"Exception handling local data: {e}")
 
 
 class JuiceboxUDPCUpdater(object):
@@ -368,8 +384,20 @@ class JuiceboxUDPCUpdater(object):
                         logging.info("UDPC IP Saved")
             except ConnectionResetError as e:
                 logging.warning(
-                    "Telnet connection to JuiceBox lost- nothing to worry"
-                    f" about unless this happens a lot. Retrying in 3s. ({e})"
+                    "Telnet connection to JuiceBox lost"
+                    f"- nothing to worry about unless this happens a lot. Retrying in 3s. ({e})"
+                )
+                interval = 3
+            except TimeoutError as e:
+                logging.warning(
+                    "Telnet connection to JuiceBox has timed out"
+                    f"- nothing to worry about unless this happens a lot. Retrying in 3s. ({e})"
+                )
+                interval = 3
+            except OSError as e:
+                logging.warning(
+                    "Could not route Telnet connection to JuiceBox"
+                    f"- nothing to worry about unless this happens a lot. Retrying in 3s. ({e})"
                 )
                 interval = 3
             except Exception as e:
