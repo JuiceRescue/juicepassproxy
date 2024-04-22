@@ -20,6 +20,7 @@ from const import (
     DEFAULT_MQTT_HOST,
     DEFAULT_MQTT_PORT,
     DEFAULT_SRC,
+    VERSION,
 )
 from dns import resolver
 from ha_mqtt_discoverable import DeviceInfo, Settings
@@ -81,6 +82,7 @@ class JuiceboxMessageHandler(object):
             ],
             manufacturer="EnelX",
             model="JuiceBox",
+            sw_version=VERSION,
             via_device="JuicePass Proxy",
         )
         self._init_device_status(device_info)
@@ -262,6 +264,15 @@ class JuiceboxMessageHandler(object):
         )
         return message
 
+    def pyproxy_oserror_message_try_parse(self, data):
+        message = {"type": "pyproxy_oserror"}
+        err_data = str(data).split("|")
+        message["status"] = "unavailable"
+        message[
+            "debug_message"
+        ] = f"PyProxy {err_data[1].title()} OSError {err_data[3]} [{err_data[2]}]: {err_data[4]}"
+        return message
+
     def debug_message_try_parse(self, data):
         message = {"type": "debug"}
         dbg_data = (
@@ -310,7 +321,9 @@ class JuiceboxMessageHandler(object):
     def local_data_handler(self, data):
         try:
             logging.debug("local: {}".format(data))
-            if ":DBG," in str(data):
+            if "PYPROXY_OSERROR" in str(data):
+                message = self.pyproxy_oserror_message_try_parse(data)
+            elif ":DBG," in str(data):
                 message = self.debug_message_try_parse(data)
             else:
                 message = self.basic_message_try_parse(data)
@@ -325,7 +338,7 @@ class JuiceboxMessageHandler(object):
         except Exception as e:
             logging.exception(f"Exception handling local data: {e}")
 
-
+            
 class JuiceboxUDPCUpdater(object):
     def __init__(self, juicebox_host, udpc_host, udpc_port=8047, timeout=None):
         self.juicebox_host = juicebox_host
@@ -346,14 +359,14 @@ class JuiceboxUDPCUpdater(object):
                     udpc_streams_to_close = {}  # Key = Connection id, Value = list id
                     udpc_stream_to_update = 0
 
-                    logging.debug(f"connections: {connections}")
+                    # logging.debug(f"connections: {connections}")
 
                     for i, connection in enumerate(connections):
                         if connection["type"] == "UDPC":
                             udpc_streams_to_close.update({int(connection["id"]): i})
                             if self.udpc_host not in connection["dest"]:
                                 udpc_stream_to_update = int(connection["id"])
-                    logging.debug(f"udpc_streams_to_close: {udpc_streams_to_close}")
+                    # logging.debug(f"udpc_streams_to_close: {udpc_streams_to_close}")
                     if udpc_stream_to_update == 0 and len(udpc_streams_to_close) > 0:
                         udpc_stream_to_update = int(max(udpc_streams_to_close, key=int))
                     logging.debug(f"Active UDPC Stream: {udpc_stream_to_update}")
@@ -411,7 +424,8 @@ def get_local_ip():
     try:
         s.connect(("10.254.254.254", 1))
         local_ip = s.getsockname()[0]
-    except Exception:
+    except Exception as e:
+        logging.warning(f"Unable to get local IP: {e}")
         local_ip = None
     s.close()
     return local_ip
@@ -420,8 +434,15 @@ def get_local_ip():
 def resolve_ip_external_dns(address, dns="1.1.1.1"):
     res = resolver.Resolver()
     res.nameservers = [dns]
-
-    answers = res.resolve(address)
+    try:
+        answers = res.resolve(address)
+    except (
+        resolver.LifetimeTimeout,
+        resolver.NoNameservers,
+        resolver.NoAnswer,
+    ) as e:
+        logging.warning(f"Unable to resolve {address}: {e}")
+        return None
 
     if len(answers) > 0:
         return answers[0].address
@@ -585,6 +606,7 @@ def main():
     else:
         logging.getLogger().setLevel(logging.INFO)
 
+    logging.info(f"Starting JuicePass Proxy {VERSION}")
     if args.update_udpc and not args.juicebox_host:
         raise argparse.ArgumentError(arg_juicebox_host, "juicebox_host is required")
 
@@ -670,7 +692,7 @@ def main():
         juicebox_id=juicebox_id,
     )
     handler.basic_message_publish(
-        {"type": "debug", "debug_message": "INFO: Starting JuicePass Proxy"}
+        {"type": "debug", "debug_message": f"INFO: Starting JuicePass Proxy {VERSION}"}
     )
     pyproxy.LOCAL_DATA_HANDLER = handler.local_data_handler
     pyproxy.REMOTE_DATA_HANDLER = handler.remote_data_handler
