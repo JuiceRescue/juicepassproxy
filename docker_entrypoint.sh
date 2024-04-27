@@ -62,6 +62,10 @@ logger INFO "UPDATE_UDPC: ${UPDATE_UDPC}"
 if $UPDATE_UDPC; then
   JPP_STRING+=" --update_udpc"
 fi
+if [[ ! -z "${UDPC_TIMEOUT}" ]]; then
+  logger INFO "UDPC_TIMEOUT: ${UDPC_TIMEOUT}" 
+  JPP_STRING+=" --udpc_timeout ${UDPC_TIMEOUT}"
+fi
 JPP_STRING+=" --config_loc /config"
 logger INFO "DEBUG: ${DEBUG}"
 if $DEBUG; then

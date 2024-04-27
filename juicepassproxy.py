@@ -307,36 +307,53 @@ class JuiceboxMessageHandler(object):
             logging.exception(f"Failed to publish sensor data to MQTT: {e}")
 
     def remote_data_handler(self, data):
-        logging.debug("remote: {}".format(data))
-        return data
+        try:
+            logging.debug("remote: {}".format(data))
+            return data
+        except IndexError as e:
+            logging.warning(
+                    "Index error when handling remote data, probably wrong number of items in list"
+                    f"- nothing to worry about unless this happens a lot. ({e})"
+                )
+        except Exception as e:
+            logging.exception(f"Exception handling local data: {e}")
 
     def local_data_handler(self, data):
-        logging.debug("local: {}".format(data))
-        if "PYPROXY_OSERROR" in str(data):
-            message = self.pyproxy_oserror_message_try_parse(data)
-        elif ":DBG," in str(data):
-            message = self.debug_message_try_parse(data)
-        else:
-            message = self.basic_message_try_parse(data)
-        if message:
-            self.basic_message_publish(message)
-        return data
+        try:
+            logging.debug("local: {}".format(data))
+            if "PYPROXY_OSERROR" in str(data):
+                message = self.pyproxy_oserror_message_try_parse(data)
+            elif ":DBG," in str(data):
+                message = self.debug_message_try_parse(data)
+            else:
+                message = self.basic_message_try_parse(data)
+            if message:
+                self.basic_message_publish(message)
+            return data
+        except IndexError as e:
+            logging.warning(
+                    "Index error when handling local data, probably wrong number of items in list"
+                    f"- nothing to worry about unless this happens a lot. ({e})"
+                )
+        except Exception as e:
+            logging.exception(f"Exception handling local data: {e}")
 
-
+            
 class JuiceboxUDPCUpdater(object):
-    def __init__(self, juicebox_host, udpc_host, udpc_port=8047):
+    def __init__(self, juicebox_host, udpc_host, udpc_port=8047, timeout=None):
         self.juicebox_host = juicebox_host
         self.udpc_host = udpc_host
         self.udpc_port = udpc_port
         self.interval = 30
         self.run_event = True
+        self.timeout = timeout
 
     def start(self):
         while self.run_event:
             interval = self.interval
             try:
-                logging.debug("JuiceboxUDPCUpdater check...")
-                with JuiceboxTelnet(self.juicebox_host, 2000) as tn:
+                logging.debug("JuiceboxUDPCUpdater check... ")
+                with JuiceboxTelnet(self.juicebox_host, 2000, self.timeout) as tn:
                     connections = tn.list()
                     update_required = True
                     udpc_streams_to_close = {}  # Key = Connection id, Value = list id
@@ -380,8 +397,20 @@ class JuiceboxUDPCUpdater(object):
                         logging.info("UDPC IP Saved")
             except ConnectionResetError as e:
                 logging.warning(
-                    "Telnet connection to JuiceBox lost- nothing to worry"
-                    f" about unless this happens a lot. Retrying in 3s. ({e})"
+                    "Telnet connection to JuiceBox lost"
+                    f"- nothing to worry about unless this happens a lot. Retrying in 3s. ({e})"
+                )
+                interval = 3
+            except TimeoutError as e:
+                logging.warning(
+                    "Telnet connection to JuiceBox has timed out"
+                    f"- nothing to worry about unless this happens a lot. Retrying in 3s. ({e})"
+                )
+                interval = 3
+            except OSError as e:
+                logging.warning(
+                    "Could not route Telnet connection to JuiceBox"
+                    f"- nothing to worry about unless this happens a lot. Retrying in 3s. ({e})"
                 )
                 interval = 3
             except Exception as e:
@@ -546,6 +575,12 @@ def main():
         action="store_true",
         help="Update UDPC on the JuiceBox. Requires --juicebox_host",
     )
+    parser.add_argument(
+        "--udpc_timeout",
+        type=int,
+        default=0,
+        help="Timeout setting for UDPC Updater",
+    )
     arg_juicebox_host = parser.add_argument(
         "--juicebox_host",
         type=str,
@@ -668,7 +703,11 @@ def main():
     if args.update_udpc:
         address = src.split(":")
         jpp_host = args.juicepass_proxy_host or address[0]
-        udpc_updater = JuiceboxUDPCUpdater(args.juicebox_host, jpp_host, address[1])
+        udpc_timeout = int(args.udpc_timeout)
+        logging.debug(f"udpc timeout: {udpc_timeout}")
+        if (udpc_timeout == 0):
+            udpc_timeout = None
+        udpc_updater = JuiceboxUDPCUpdater(args.juicebox_host, jpp_host, address[1], udpc_timeout)
         udpc_updater_thread = Thread(target=udpc_updater.start)
         udpc_updater_thread.start()
 
