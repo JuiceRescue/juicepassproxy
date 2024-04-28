@@ -20,6 +20,7 @@ from const import (
     DEFAULT_MQTT_HOST,
     DEFAULT_MQTT_PORT,
     DEFAULT_SRC,
+    DEFAULT_TELNET_TIMEOUT,
     VERSION,
 )
 from dns import resolver
@@ -72,13 +73,17 @@ class JuiceboxMessageHandler(object):
     def _init_devices(self):
         device_info = DeviceInfo(
             name=self.device_name,
-            identifiers=[self.juicebox_id]
-            if self.juicebox_id is not None
-            else [self.device_name],
-            connections=[
-                ["JuiceBox ID", self.juicebox_id]
+            identifiers=(
+                [self.juicebox_id]
                 if self.juicebox_id is not None
-                else []
+                else [self.device_name]
+            ),
+            connections=[
+                (
+                    ["JuiceBox ID", self.juicebox_id]
+                    if self.juicebox_id is not None
+                    else []
+                )
             ],
             manufacturer="EnelX",
             model="JuiceBox",
@@ -268,9 +273,10 @@ class JuiceboxMessageHandler(object):
         message = {"type": "pyproxy_oserror"}
         err_data = str(data).split("|")
         message["status"] = "unavailable"
-        message[
-            "debug_message"
-        ] = f"PyProxy {err_data[1].title()} OSError {err_data[3]} [{err_data[2]}]: {err_data[4]}"
+        message["debug_message"] = (
+            f"PyProxy {err_data[1].title()} OSError {err_data[3]} [{
+                err_data[2]}]: {err_data[4]}"
+        )
         return message
 
     def debug_message_try_parse(self, data):
@@ -312,9 +318,9 @@ class JuiceboxMessageHandler(object):
             return data
         except IndexError as e:
             logging.warning(
-                    "Index error when handling remote data, probably wrong number of items in list"
-                    f"- nothing to worry about unless this happens a lot. ({e})"
-                )
+                "Index error when handling remote data, probably wrong number of items in list"
+                f"- nothing to worry about unless this happens a lot. ({e})"
+            )
         except Exception as e:
             logging.exception(f"Exception handling local data: {e}")
 
@@ -332,28 +338,30 @@ class JuiceboxMessageHandler(object):
             return data
         except IndexError as e:
             logging.warning(
-                    "Index error when handling local data, probably wrong number of items in list"
-                    f"- nothing to worry about unless this happens a lot. ({e})"
-                )
+                "Index error when handling local data, probably wrong number of items in list"
+                f"- nothing to worry about unless this happens a lot. ({e})"
+            )
         except Exception as e:
             logging.exception(f"Exception handling local data: {e}")
 
-            
+
 class JuiceboxUDPCUpdater(object):
-    def __init__(self, juicebox_host, udpc_host, udpc_port=8047, timeout=None):
+    def __init__(self, juicebox_host, udpc_host, udpc_port=8047, telnet_timeout=None):
         self.juicebox_host = juicebox_host
         self.udpc_host = udpc_host
         self.udpc_port = udpc_port
         self.interval = 30
         self.run_event = True
-        self.timeout = timeout
+        self.telnet_timeout = telnet_timeout
 
     def start(self):
         while self.run_event:
             interval = self.interval
             try:
                 logging.debug("JuiceboxUDPCUpdater check... ")
-                with JuiceboxTelnet(self.juicebox_host, 2000, self.timeout) as tn:
+                with JuiceboxTelnet(
+                    self.juicebox_host, port=2000, timeout=self.telnet_timeout
+                ) as tn:
                     connections = tn.list()
                     update_required = True
                     udpc_streams_to_close = {}  # Key = Connection id, Value = list id
@@ -398,19 +406,22 @@ class JuiceboxUDPCUpdater(object):
             except ConnectionResetError as e:
                 logging.warning(
                     "Telnet connection to JuiceBox lost"
-                    f"- nothing to worry about unless this happens a lot. Retrying in 3s. ({e})"
+                    f"- nothing to worry about unless this happens a lot. Retrying in 3s. ({
+                        e})"
                 )
                 interval = 3
             except TimeoutError as e:
                 logging.warning(
                     "Telnet connection to JuiceBox has timed out"
-                    f"- nothing to worry about unless this happens a lot. Retrying in 3s. ({e})"
+                    f"- nothing to worry about unless this happens a lot. Retrying in 3s. ({
+                        e})"
                 )
                 interval = 3
             except OSError as e:
                 logging.warning(
                     "Could not route Telnet connection to JuiceBox"
-                    f"- nothing to worry about unless this happens a lot. Retrying in 3s. ({e})"
+                    f"- nothing to worry about unless this happens a lot. Retrying in 3s. ({
+                        e})"
                 )
                 interval = 3
             except Exception as e:
@@ -457,9 +468,9 @@ def is_valid_ip(test_ip):
     return True
 
 
-def get_enelx_server_port(juicebox_host):
+def get_enelx_server_port(juicebox_host, telnet_timeout=None):
     try:
-        with JuiceboxTelnet(juicebox_host) as tn:
+        with JuiceboxTelnet(juicebox_host, timeout=telnet_timeout) as tn:
             connections = tn.list()
             # logging.debug(f"connections: {connections}")
             for connection in connections:
@@ -474,9 +485,9 @@ def get_enelx_server_port(juicebox_host):
         return None
 
 
-def get_juicebox_id(juicebox_host):
+def get_juicebox_id(juicebox_host, telnet_timeout=None):
     try:
-        with JuiceboxTelnet(juicebox_host) as tn:
+        with JuiceboxTelnet(juicebox_host, timeout=telnet_timeout) as tn:
             return (
                 tn.get("email.name_address")
                 .get("email.name_address")
@@ -576,10 +587,10 @@ def main():
         help="Update UDPC on the JuiceBox. Requires --juicebox_host",
     )
     parser.add_argument(
-        "--udpc_timeout",
+        "--telnet_timeout",
         type=int,
-        default=0,
-        help="Timeout setting for UDPC Updater",
+        default=DEFAULT_TELNET_TIMEOUT,
+        help="Timeout in seconds for Telnet operations (default: %(default)s)",
     )
     arg_juicebox_host = parser.add_argument(
         "--juicebox_host",
@@ -620,7 +631,14 @@ def main():
     logging.info(f"config_loc: {config_loc}")
     config = load_config(config_loc)
 
-    if enelx_server_port := get_enelx_server_port(args.juicebox_host):
+    telnet_timeout = int(args.telnet_timeout)
+    logging.debug(f"telnet timeout: {telnet_timeout}")
+    if telnet_timeout == 0:
+        telnet_timeout = None
+
+    if enelx_server_port := get_enelx_server_port(
+        args.juicebox_host, telnet_timeout=telnet_timeout
+    ):
         logging.debug(f"enelx_server_port: {enelx_server_port}")
         enelx_server = enelx_server_port.split(":")[0]
         enelx_port = enelx_server_port.split(":")[1]
@@ -640,7 +658,7 @@ def main():
     elif local_ip := get_local_ip():
         src = f"{local_ip}:{enelx_port}"
     else:
-        src = f"{config.get('SRC',DEFAULT_SRC)}:{enelx_port}"
+        src = f"{config.get('SRC', DEFAULT_SRC)}:{enelx_port}"
     config.update({"SRC": src.split(":")[0]})
     logging.info(f"src: {src}")
 
@@ -666,7 +684,9 @@ def main():
 
     if juicebox_id := args.juicebox_id:
         pass
-    elif juicebox_id := get_juicebox_id(args.juicebox_host):
+    elif juicebox_id := get_juicebox_id(
+        args.juicebox_host, telnet_timeout=telnet_timeout
+    ):
         pass
     else:
         juicebox_id = config.get("JUICEBOX_ID")
@@ -703,11 +723,12 @@ def main():
     if args.update_udpc:
         address = src.split(":")
         jpp_host = args.juicepass_proxy_host or address[0]
-        udpc_timeout = int(args.udpc_timeout)
-        logging.debug(f"udpc timeout: {udpc_timeout}")
-        if (udpc_timeout == 0):
-            udpc_timeout = None
-        udpc_updater = JuiceboxUDPCUpdater(args.juicebox_host, jpp_host, address[1], udpc_timeout)
+        udpc_updater = JuiceboxUDPCUpdater(
+            args.juicebox_host,
+            juicebox_host=jpp_host,
+            udpc_host=address[1],
+            telnet_timeout=telnet_timeout,
+        )
         udpc_updater_thread = Thread(target=udpc_updater.start)
         udpc_updater_thread.start()
 

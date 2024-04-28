@@ -62,9 +62,9 @@ logger INFO "UPDATE_UDPC: ${UPDATE_UDPC}"
 if $UPDATE_UDPC; then
   JPP_STRING+=" --update_udpc"
 fi
-if [[ ! -z "${UDPC_TIMEOUT}" ]]; then
-  logger INFO "UDPC_TIMEOUT: ${UDPC_TIMEOUT}" 
-  JPP_STRING+=" --udpc_timeout ${UDPC_TIMEOUT}"
+if [[ ! -z "${TELNET_TIMEOUT}" ]]; then
+  logger INFO "TELNET_TIMEOUT: ${TELNET_TIMEOUT}"
+  JPP_STRING+=" --telnet_timeout ${TELNET_TIMEOUT}"
 fi
 JPP_STRING+=" --config_loc /config"
 logger INFO "DEBUG: ${DEBUG}"
