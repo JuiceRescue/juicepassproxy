@@ -107,7 +107,9 @@ class JuiceboxMITM:
         src_addr,
         dst_addr,
         local_data_handler=None,
+        ignore_remote=False,
         remote_data_handler=None,
+        mqtt_handler=None,
         loglevel=None,
     ):
         # logger.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")
@@ -115,16 +117,18 @@ class JuiceboxMITM:
             logger.setLevel(loglevel)
         self.src_addr = self.ip_to_tuple(src_addr)
         self.dst_addr = self.ip_to_tuple(dst_addr)
+        self.ignore_remote = ignore_remote
         self.local_data_handler = local_data_handler
         self.remote_data_handler = remote_data_handler
+        self.mqtt_handler = mqtt_handler
         self.client_address = None
         self.loop = asyncio.get_running_loop()
 
     async def start(self) -> None:
         # logger.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")
         logger.info("Starting JuiceboxMITM")
-        logger.debug(f"Src: {self.src_addr}")
-        logger.debug(f"Dst: {self.dst_addr}")
+        logger.debug(f"Src: {self.src_addr[0]}:{self.src_addr[1]}")
+        logger.debug(f"Dst: {self.dst_addr[0]}:{self.dst_addr[1]}")
 
         on_con_lost = self.loop.create_future()
         udp_mitm, _ = await self.loop.create_datagram_endpoint(
@@ -156,6 +160,23 @@ class JuiceboxMITM:
         finally:
             udp_send.close()
 
+    async def send_data_to_local_address(self, data: bytes):
+        # logger.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")
+        if data is None:
+            return None
+        on_con_lost = self.loop.create_future()
+
+        # logger.debug(f"sending: {data}, to: {addr}")
+        udp_send, _ = await self.loop.create_datagram_endpoint(
+            lambda: JuiceboxMITM_SendProtocol(data, self.handler, on_con_lost),
+            remote_addr=self.client_address,
+        )
+
+        try:
+            await on_con_lost
+        finally:
+            udp_send.close()
+
     async def handler(self, data: bytes, from_addr: tuple[str, int]):
         # logger.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")
         if data is None or from_addr is None:
@@ -163,34 +184,38 @@ class JuiceboxMITM:
 
         if from_addr[0] != self.dst_addr[0]:
             self.client_address = from_addr
-            logger.debug(f"self.client_address: {self.client_address}")
+            # logger.debug(f"self.client_address: {self.client_address}")
 
         if from_addr == self.client_address:
             data = await self.local_data_handler(data)
-            try:
-                await self.send_data(data, self.dst_addr)
-            except OSError as e:
-                logger.warning(
-                    f"JuiceboxMITM OSError {
-                        errno.errorcode[e.errno]} [{self.dst_addr}]: {e}"
-                )
-                await self.local_data_handler(
-                    f"JuiceboxMITM_OSERROR|server|{self.dst_addr}|{
-                        errno.errorcode[e.errno]}|{e}"
-                )
+            if not self.ignore_remote:
+                try:
+                    await self.send_data(data, self.dst_addr)
+                except OSError as e:
+                    logger.warning(
+                        f"JuiceboxMITM OSError {
+                            errno.errorcode[e.errno]} [{self.dst_addr}]: {e}"
+                    )
+                    await self.local_data_handler(
+                        f"JuiceboxMITM_OSERROR|server|{self.dst_addr}|{
+                            errno.errorcode[e.errno]}|{e}"
+                    )
         elif self.client_address is not None and from_addr == self.dst_addr:
-            data = await self.remote_data_handler(data)
-            try:
-                await self.send_data(data, self.client_address)
-            except OSError as e:
-                logger.warning(
-                    f"JuiceboxMITM OSError {
-                        errno.errorcode[e.errno]} [{self.client_address}]: {e}"
-                )
-                await self.local_data_handler(
-                    f"JuiceboxMITM_OSERROR|client|{self.client_address}|{
-                        errno.errorcode[e.errno]}|{e}"
-                )
+            if not self.ignore_remote:
+                data = await self.remote_data_handler(data)
+                try:
+                    await self.send_data(data, self.client_address)
+                except OSError as e:
+                    logger.warning(
+                        f"JuiceboxMITM OSError {
+                            errno.errorcode[e.errno]} [{self.client_address}]: {e}"
+                    )
+                    await self.local_data_handler(
+                        f"JuiceboxMITM_OSERROR|client|{self.client_address}|{
+                            errno.errorcode[e.errno]}|{e}"
+                    )
+            else:
+                logger.info(f"Ignoring Remote: {data}")
         else:
             logger.warning(f"JuiceboxMITM Unknown address: {from_addr}")
 

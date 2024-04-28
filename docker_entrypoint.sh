@@ -4,7 +4,7 @@ JUICEPASSPROXY="/juicepassproxy/juicepassproxy.py"
 
 function logger() {
   if [ "${1^^}" != "DEBUG" ] || ($DEBUG && [ "${1^^}" = "DEBUG" ]); then
-    printf "%-15s %-10s %s\n" "$(date +'%Y-%m-%d %H:%M:%S,%3N')" "${1^^}" "${2}"
+    printf "%-20s %-9s [entrypoint.sh] %s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "${1^^}" "${2}"
   fi
 }
 
@@ -62,15 +62,27 @@ logger INFO "UPDATE_UDPC: ${UPDATE_UDPC}"
 if $UPDATE_UDPC; then
   JPP_STRING+=" --update_udpc"
 fi
-if [[ ! -z "${UDPC_TIMEOUT}" ]]; then
-  logger INFO "UDPC_TIMEOUT: ${UDPC_TIMEOUT}" 
-  JPP_STRING+=" --udpc_timeout ${UDPC_TIMEOUT}"
+if [[ ! -z "${TELNET_TIMEOUT}" ]]; then
+  logger INFO "TELNET_TIMEOUT: ${TELNET_TIMEOUT}"
+  JPP_STRING+=" --telnet_timeout ${TELNET_TIMEOUT}"
 fi
 JPP_STRING+=" --config_loc /config"
 logger INFO "DEBUG: ${DEBUG}"
 if $DEBUG; then
   JPP_STRING+=" --debug"
 fi
+if [[ -v IGNORE_REMOTE ]] && $IGNORE_REMOTE; then
+  JPP_STRING+=" --ignore_remote"
+  logger INFO "IGNORE_REMOTE: true"
+else
+  logger INFO "IGNORE_REMOTE: false"
+fi
+if [[ -v EXPERIMENTAL ]] && $EXPERIMENTAL; then
+  JPP_STRING+=" --experimental"
+  logger INFO "EXPERIMENTAL: true"
+else
+  logger INFO "EXPERIMENTAL: false"
+fi
 
 logger DEBUG "COMMAND: $(echo ${JPP_STRING} | sed -E 's/(.* --mqtt_password )([\"]?[a-zA-Z0-9_\?\*\^\&\#\@\!]+[\"]?)/\1*****/g')"
-eval ${JPP_STRING}
+exec ${JPP_STRING}

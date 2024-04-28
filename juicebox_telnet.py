@@ -1,35 +1,110 @@
-from telnetlib import Telnet
+import asyncio
+import logging
+
+import telnetlib3
+
+# import sys
+
+logger = logging.getLogger(__name__)
 
 
-class JuiceboxTelnet(object):
-    def __init__(self, host, port=2000, timeout=None):
+class JuiceboxTelnet:
+    def __init__(self, host, port=2000, timeout=None, loglevel=None):
+        # logger.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
+        if loglevel is not None:
+            logger.setLevel(loglevel)
         self.host = host
         self.port = port
-        self.connection = None
+        self.reader = None
+        self.writer = None
         self.timeout = timeout
+        # logger.debug(f"self.timeout: {self.timeout}")
 
-    def __enter__(self):
-        self.connection = self.open()
+    async def __aenter__(self):
+        # logger.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
+        await self.open()
         return self
 
-    def __exit__(self, exc_type, exc_value, exc_tb):
-        if self.connection:
-            self.connection.close()
-        self.connection = None
+    async def __aexit__(self, exc_type, exc_value, exc_tb):
+        # logger.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
+        if self.reader:
+            self.reader.close()
+        self.reader = None
+        if self.writer:
+            self.writer.close()
+        self.writer = None
 
-    def open(self):
-        if not self.connection:
-            self.connection = Telnet(host=self.host, port=self.port, timeout=self.timeout)
-            self.connection.read_until(b">", self.timeout)
-        return self.connection
+    async def read_until(self, match: bytes):
+        # logger.debug(f"read_until match: {match}")
+        data = b""
+        if self.reader is None:
+            logger.debug(
+                "read_until called but Telnet not connected. Trying to connect"
+            )
+            await self.open()
+            if self.reader is None:
+                logger.warning(
+                    "read_until called but Telnet not connected. Retry Failed"
+                )
+                return data
+        try:
+            async with asyncio.timeout(self.timeout):
+                while not data.endswith(match):
+                    chunk = await self.reader.read(1)
+                    if not chunk:
+                        break
+                    # logger.debug(f"chunk: {chunk}")
+                    if isinstance(chunk, (bytes, bytearray)):
+                        data += chunk
+                    else:
+                        data += str.encode(chunk)
+        except asyncio.TimeoutError:
+            logger.warning(f"TimeoutError: read_until (data: {data})")
+            return data
+        # logger.debug(f"read_until data: {data}")
+        return data
 
-    def list(self):
-        tn = self.open()
-        tn.write(b"\n")
-        tn.read_until(b"> ", self.timeout)
-        tn.write(b"list\n")
-        tn.read_until(b"list\r\n! ", self.timeout)
-        res = tn.read_until(b">", self.timeout)
+    async def write(self, data: bytes):
+        # logger.debug(f"write data: {data}")
+        if self.writer is None:
+            logger.debug("write called but Telnet not connected. Trying to connect")
+            await self.open()
+            if self.writer is None:
+                logger.warning("write called but Telnet not connected. Retry Failed")
+                return False
+        try:
+            async with asyncio.timeout(self.timeout):
+                # logger.debug(f"self.writer type check 2: {type(self.writer)}")
+                self.writer.write(data)
+                await self.writer.drain()
+        except TimeoutError:
+            logger.warning("TimeoutError: write")
+            return False
+        return True
+
+    async def open(self):
+        # logger.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
+        if self.reader is None or self.writer is None:
+            try:
+                async with asyncio.timeout(self.timeout):
+                    self.reader, self.writer = await telnetlib3.open_connection(
+                        self.host, self.port, encoding=False
+                    )
+                await self.read_until(b">")
+            except TimeoutError:
+                logger.warning("TimeoutError: Open Telnet Connection Failed")
+                return False
+        # logger.debug("Telnet Opened")
+        return True
+
+    async def list(self):
+        # logger.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
+        await self.open()
+        await self.write(b"\n")
+        await self.read_until(b"> ")
+        await self.write(b"list\n")
+        await self.read_until(b"list\r\n! ")
+        res = await self.read_until(b">")
         lines = str(res[:-3]).split("\\r\\n")
         out = []
         for line in lines[1:]:
@@ -38,24 +113,26 @@ class JuiceboxTelnet(object):
                 out.append({"id": parts[1], "type": parts[2], "dest": parts[4]})
         return out
 
-    def get(self, variable):
-        tn = self.open()
-        tn.write(b"\n")
-        tn.read_until(b"> ", self.timeout)
+    async def get_variable(self, variable) -> bytes:
+        # logger.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
+        await self.open()
+        await self.write(b"\n")
+        await self.read_until(b"> ")
         cmd = f"get {variable}\r\n".encode("ascii")
-        tn.write(cmd)
-        tn.read_until(cmd, self.timeout)
-        res = tn.read_until(b">", self.timeout)
-        return {variable: str(res[:-1].strip())}
+        await self.write(cmd)
+        await self.read_until(cmd)
+        res = await self.read_until(b">")
+        return res[:-1].strip()
 
-    def get_all(self):
-        tn = self.open()
-        tn.write(b"\n")
-        tn.read_until(b">", self.timeout)
+    async def get_all(self):
+        # logger.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
+        await self.open()
+        await self.write(b"\n")
+        await self.read_until(b">")
         cmd = "get all\r\n".encode("ascii")
-        tn.write(cmd)
-        tn.read_until(cmd, self.timeout)
-        res = tn.read_until(b">", self.timeout)
+        await self.write(cmd)
+        await self.read_until(cmd)
+        res = await self.read_until(b">")
         lines = str(res[:-1]).split("\\r\\n")
         vars = {}
         for line in lines:
@@ -64,23 +141,26 @@ class JuiceboxTelnet(object):
                 vars[parts[0]] = parts[1]
         return vars
 
-    def stream_close(self, id):
-        tn = self.open()
-        tn.write(b"\n")
-        tn.read_until(b">", self.timeout)
-        tn.write(f"stream_close {id}\n".encode("ascii"))
-        tn.read_until(b">", self.timeout)
+    async def stream_close(self, id):
+        # logger.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
+        await self.open()
+        await self.write(b"\n")
+        await self.read_until(b">")
+        await self.write(f"stream_close {id}\n".encode("ascii"))
+        await self.read_until(b">")
 
-    def udpc(self, host, port):
-        tn = self.open()
-        tn.write(b"\n")
-        tn.read_until(b">", self.timeout)
-        tn.write(f"udpc {host} {port}\n".encode("ascii"))
-        tn.read_until(b">", self.timeout)
+    async def write_udpc(self, host, port):
+        # logger.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
+        await self.open()
+        await self.write(b"\n")
+        await self.read_until(b">")
+        await self.write(f"udpc {host} {port}\n".encode("ascii"))
+        await self.read_until(b">")
 
-    def save(self):
-        tn = self.open()
-        tn.write(b"\n")
-        tn.read_until(b">", self.timeout)
-        tn.write(b"save\n")
-        tn.read_until(b">", self.timeout)
+    async def save(self):
+        # logger.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
+        await self.open()
+        await self.write(b"\n")
+        await self.read_until(b">")
+        await self.write(b"save\n")
+        await self.read_until(b">")
