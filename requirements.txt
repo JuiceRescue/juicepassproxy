@@ -2,3 +2,5 @@ ha-mqtt-discoverable >= 0.10.0
 paho-mqtt >= 1.6.1
 dnspython >= 2.0.0
 pyyaml
+telnetlib3
+aiorun
