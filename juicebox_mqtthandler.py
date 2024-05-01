@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+import sys
 
 from const import VERSION
 from ha_mqtt_discoverable import DeviceInfo, Settings
@@ -19,7 +20,7 @@ class JuiceboxMQTTEntity:
         name,
         **kwargs,
     ):
-        self.ent_type = "sensor"
+        # logger.debug(f"Entity Init: {name}")
         self.name = name
         self.kwargs = kwargs
         self.unique_id = f"{self.kwargs.get("juicebox_id", None)} {self.name}"
@@ -27,10 +28,18 @@ class JuiceboxMQTTEntity:
         self.state = None
         self.attributes = {}
         self._mqtt = None
+        self.loop = asyncio.get_running_loop()
+        self._mitm_handler = self.kwargs.get("mitm_handler", None)
+        if self._mitm_handler:
+            logger.debug(f"mitm_handler type: {self._mitm_handler}")
 
     def add_kwargs(self, **kwargs):
         self.kwargs.update(kwargs)
         self.unique_id = f"{self.kwargs.get("juicebox_id", None)} {self.name}"
+        self.experimental = self.kwargs.get("experimental", False)
+        self._mitm_handler = self.kwargs.get("mitm_handler", None)
+        if self._mitm_handler:
+            logger.debug(f"mitm_handler type: {self._mitm_handler}")
 
     async def set_state(self, state=None):
         self.state = state
@@ -54,58 +63,85 @@ class JuiceboxMQTTEntity:
 
 
 class JuiceboxMQTTSensor(JuiceboxMQTTEntity):
+
+    def __init__(
+        self,
+        name,
+        **kwargs,
+    ):
+        # logger.debug(f"Sensor Init: {name}")
+        self.ent_type = "sensor"
+        super().__init__(name, **kwargs)
+
     async def start(self):
         # logger.debug(f"JuiceboxMQTTSensor Function: {sys._getframe().f_code.co_name}")
 
-        sensor_info = SensorInfo(
-            name=self.name,
-            unique_id=self.unique_id,
-            icon=self.kwargs.get("icon", None),
-            state_class=self.kwargs.get("state_class", None),
-            device_class=self.kwargs.get("device_class", None),
-            unit_of_measurement=self.kwargs.get("unit_of_measurement", None),
-            entity_category=self.kwargs.get("entity_category", None),
-            expire_after=self.kwargs.get("expire_after", None),
-            enabled_by_default=self.kwargs.get("enabled_by_default", True),
-            device=self.kwargs.get("device", self.kwargs.get("device_info", None)),
+        self._mqtt = Sensor(
+            Settings(
+                mqtt=self.kwargs.get("mqtt", self.kwargs.get("mqtt_settings", None)),
+                entity=SensorInfo(
+                    name=self.name,
+                    unique_id=self.unique_id,
+                    icon=self.kwargs.get("icon", None),
+                    state_class=self.kwargs.get("state_class", None),
+                    device_class=self.kwargs.get("device_class", None),
+                    unit_of_measurement=self.kwargs.get("unit_of_measurement", None),
+                    entity_category=self.kwargs.get("entity_category", None),
+                    expire_after=self.kwargs.get("expire_after", None),
+                    enabled_by_default=self.kwargs.get("enabled_by_default", True),
+                    device=self.kwargs.get(
+                        "device", self.kwargs.get("device_info", None)
+                    ),
+                ),
+            )
         )
 
-        settings = Settings(
-            mqtt=self.kwargs.get("mqtt", self.kwargs.get("mqtt_settings", None)),
-            entity=sensor_info,
-        )
-        sensor = Sensor(settings)
-        self._mqtt = sensor
-        await self.set_state(self.kwargs.get("initial_state", None))
-        # logger.debug(f"started {self.name} mqtt: {self._mqtt}")
+        if self.kwargs.get("initial_state", None) is not None:
+            await self.set_state(self.kwargs.get("initial_state", None))
+        # logger.debug(f"Started Sensor: {self.name}. MQTT: {self._mqtt}")
 
 
 class JuiceboxMQTTText(JuiceboxMQTTEntity):
 
+    def __init__(
+        self,
+        name,
+        **kwargs,
+    ):
+        logger.debug(f"Text Init: {name}")
+        self.ent_type = "text"
+        super().__init__(name, **kwargs)
+
     async def start(self):
-        # logger.debug(f"JuiceboxMQTTSensor Function: {sys._getframe().f_code.co_name}")
+        logger.debug(f"JuiceboxMQTTText Function: {sys._getframe().f_code.co_name}")
 
         self.callback = self.kwargs.get("callback", self.default_callback)
-        text_info = TextInfo(
-            name=self.name,
-            unique_id=self.unique_id,
-            device=self.kwargs.get("device", self.kwargs.get("device_info", None)),
-            icon=self.kwargs.get("icon", None),
-            device_class=self.kwargs.get("device_class", None),
-            unit_of_measurement=self.kwargs.get("unit_of_measurement", None),
-            entity_category=self.kwargs.get("entity_category", None),
-            expire_after=self.kwargs.get("expire_after", None),
-            enabled_by_default=self.kwargs.get("enabled_by_default", True),
+
+        self._mqtt = Text(
+            Settings(
+                mqtt=self.kwargs.get("mqtt", self.kwargs.get("mqtt_settings", None)),
+                entity=TextInfo(
+                    name=self.name,
+                    unique_id=self.unique_id,
+                    device=self.kwargs.get(
+                        "device", self.kwargs.get("device_info", None)
+                    ),
+                    icon=self.kwargs.get("icon", None),
+                    device_class=self.kwargs.get("device_class", None),
+                    unit_of_measurement=self.kwargs.get("unit_of_measurement", None),
+                    entity_category=self.kwargs.get("entity_category", None),
+                    expire_after=self.kwargs.get("expire_after", None),
+                    enabled_by_default=self.kwargs.get("enabled_by_default", True),
+                ),
+            ),
+            command_callback=self.callback,
+            user_data=self.kwargs.get("user_data", None),
         )
 
-        settings = Settings(
-            mqtt=self.kwargs.get("mqtt", self.kwargs.get("mqtt_settings", None)),
-            entity=text_info,
-        )
-        text = Text(settings, self.callback, self.kwargs.get("user_data", None))
-        self._mqtt = text
-        await self.set_text(self.kwargs.get("initial_text", None))
-        # logger.debug(f"started {self.name} mqtt: {self._mqtt}")
+        if self.kwargs.get("initial_text", None) is not None:
+            # logger.debug("sending initial_text")
+            await self.set_text(self.kwargs.get("initial_text", None))
+        logger.debug(f"Started Text: {self.name}. MQTT: {self._mqtt}")
 
     async def set_state(self, state=None):
         await self.set_text(state)
@@ -114,6 +150,7 @@ class JuiceboxMQTTText(JuiceboxMQTTEntity):
         self.state = text
         try:
             self._mqtt.set_text(text)
+            logger.debug(f"Set Text ({self.name}): {text}")
         except AttributeError as e:
             logger.warning(
                 f"Can't update text for {
@@ -121,9 +158,20 @@ class JuiceboxMQTTText(JuiceboxMQTTEntity):
             )
 
     def default_callback(self, client: Client, user_data, message: MQTTMessage):
+        self.loop.create_task(self.default_callback_async(client, user_data, message))
+
+    async def default_callback_async(
+        self, client: Client, user_data, message: MQTTMessage
+    ):
         text = message.payload.decode()
-        logging.info(f"Received {text} from HA")
-        logging.info(f"user_data: {user_data}")
+        logger.info(f"Text Callback ({self.name}): {text}. User Data: {user_data}")
+        if self._mitm_handler:
+            logger.debug(f"Sending to MITM: {text}")
+            await self._mitm_handler.send_data_to_juicebox(bytes(text, "utf-8"))
+        else:
+            logger.debug(
+                f"Cannot send to MITM. mitm_handler type: {type(self._mitm_handler)}"
+            )
         # do_some_custom_thing(text)
         # Send an MQTT message to confirm to HA that the text was changed
         # await self.set_text(text)
@@ -145,7 +193,7 @@ class JuiceboxMQTTHandler:
         self.mqtt_settings = mqtt_settings
         self.device_name = device_name
         self.juicebox_id = juicebox_id
-        self.mitm_handler = mitm_handler
+        self._mitm_handler = mitm_handler
         self.device_info = DeviceInfo(
             name=self.device_name,
             identifiers=(
@@ -246,14 +294,23 @@ class JuiceboxMQTTHandler:
                 experimental=True,
                 enabled_by_default=False,
                 entity_category="diagnostic",
+                initial_text="Started",
             ),
         }
+        logger.debug(f"MQTT mitm_handler type: {type(self._mitm_handler)}")
         for entity in self.entities.values():
+            # logger.debug(f"Adding extras to: {entity.name} (type: {entity.ent_type})")
             entity.add_kwargs(
                 juicebox_id=self.juicebox_id,
                 device_info=self.device_info,
                 mqtt_settings=self.mqtt_settings,
             )
+            if entity.ent_type in ["text"]:
+                logger.debug(
+                    f"Adding mitm_handler ({type(self._mitm_handler)}) to: {
+                        entity.name} (type: {entity.ent_type})"
+                )
+                entity.add_kwargs(mitm_handler=self._mitm_handler)
 
     async def start(self):
         # logger.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
@@ -262,6 +319,7 @@ class JuiceboxMQTTHandler:
         gather_list = []
         for entity in self.entities.values():
             if entity.experimental is False or self.experimental is True:
+                # logger.debug(f"MQTT Gather: {entity.name}")
                 gather_list.append(asyncio.create_task(entity.start()))
         await asyncio.gather(
             *gather_list,
@@ -269,6 +327,18 @@ class JuiceboxMQTTHandler:
         )
 
         # await self.basic_message_publish({"type": "debug", "debug_message": f"INFO: Starting JuicePass Proxy {VERSION}",})
+
+    async def set_mitm_handler(self, mitm_handler):
+        logger.debug(f"mitm_handler type: {type(mitm_handler)}")
+
+        self._mitm_handler = mitm_handler
+        for entity in self.entities.values():
+            if entity.ent_type in ["text"]:
+                logger.debug(
+                    f"Adding mitm_handler ({type(self._mitm_handler)}) to: {
+                        entity.name} (type: {entity.ent_type})"
+                )
+                entity.add_kwargs(mitm_handler=mitm_handler)
 
     async def basic_message_parse(self, data: bytes):
         # logger.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")

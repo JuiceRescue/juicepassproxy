@@ -56,6 +56,10 @@ logging.basicConfig(
     format="%(asctime)-20s %(levelname)-9s [%(name)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
     level=logging.INFO,
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler("/logs/juicepassproxy.log", mode="w"),
+    ],
 )
 logger = logging.getLogger(__name__)
 
@@ -378,13 +382,13 @@ async def main():
         experimental = True
     else:
         experimental = False
-    logging.info(f"experimental: {experimental}")
+    logger.info(f"experimental: {experimental}")
 
     if args.ignore_remote:
         ignore_remote = True
     else:
         ignore_remote = False
-    logging.info(f"ignore_remote: {ignore_remote}")
+    logger.info(f"ignore_remote: {ignore_remote}")
 
     await write_config(config, config_loc)
 
@@ -419,11 +423,11 @@ async def main():
         ignore_remote=ignore_remote,
         loglevel=logger.getEffectiveLevel(),
     )
-    mitm_handler.set_local_data_handler(mqtt_handler.local_data_handler)
-    mitm_handler.set_remote_data_handler(mqtt_handler.remote_data_handler)
+    await mitm_handler.set_local_data_handler(mqtt_handler.local_data_handler)
+    await mitm_handler.set_remote_data_handler(mqtt_handler.remote_data_handler)
     gather_list.append(asyncio.create_task(mitm_handler.start()))
 
-    mqtt_handler.mitm_handler = mitm_handler
+    await mqtt_handler.set_mitm_handler(mitm_handler)
     mitm_handler.mqtt_handler = mqtt_handler
 
     if args.update_udpc:

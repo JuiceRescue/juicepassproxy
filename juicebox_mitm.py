@@ -51,8 +51,21 @@ class JuiceboxMITM_RecvProtocol(asyncio.DatagramProtocol):
         # logger.debug(f"JuiceboxMITM_RecvProtocol Recv: {data} from {addr}")
         await self.handler(data, addr)
 
-    def connection_lost(self, exc: Exception | None) -> None:
+    def error_received(self, e: Exception | None) -> None:
         # logger.debug(f"JuiceboxMITM_RecvProtocol Function: {sys._getframe().f_code.co_name}")
+        logger.error(
+            f"JuiceboxMITM_RecvProtocol Error received. ({e.__class__.__qualname__}: {
+                e})"
+        )
+
+    def connection_lost(self, e: Exception | None) -> None:
+        # logger.debug(f"JuiceboxMITM_RecvProtocol Function: {sys._getframe().f_code.co_name}")
+        if e is not None:
+            logger.error(
+                f"JuiceboxMITM_RecvProtocol Connection Lost. ({e.__class__.__qualname__}: {
+                    e})"
+            )
+
         if not self.on_con_lost.cancelled():
             self.on_con_lost.set_result(True)
 
@@ -91,12 +104,21 @@ class JuiceboxMITM_SendProtocol(asyncio.DatagramProtocol):
         # logger.debug(f"JuiceboxMITM_SendProtocol Recv: {data} from {addr}")
         await self.handler(data, addr)
 
-    def error_received(self, exc: Exception | None) -> None:
+    def error_received(self, e: Exception | None) -> None:
         # logger.debug(f"JuiceboxMITM_SendProtocol Function: {sys._getframe().f_code.co_name}")
-        logger.error(f"JuiceboxMITM_SendProtocol Error received: {exc}")
+        logger.error(
+            f"JuiceboxMITM_SendProtocol Error received. ({e.__class__.__qualname__}: {
+                e})"
+        )
 
-    def connection_lost(self, exc: Exception | None) -> None:
+    def connection_lost(self, e: Exception | None) -> None:
         # logger.debug(f"JuiceboxMITM_SendProtocol Function: {sys._getframe().f_code.co_name}")
+        if e is not None:
+            logger.error(
+                f"JuiceboxMITM_SendProtocol Connection Lost. ({e.__class__.__qualname__}: {
+                    e})"
+            )
+
         if not self.on_con_lost.cancelled():
             self.on_con_lost.set_result(True)
 
@@ -143,16 +165,33 @@ class JuiceboxMITM:
         finally:
             udp_mitm.close()
 
-    async def send_data(self, data: bytes, addr: tuple[str, int]):
+    async def send_data(self, data: bytes, to_addr: tuple[str, int]):
         # logger.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")
-        if data is None or addr is None:
+        if data is None or to_addr is None:
             return None
         on_con_lost = self.loop.create_future()
 
         # logger.debug(f"sending: {data}, to: {addr}")
         udp_send, _ = await self.loop.create_datagram_endpoint(
             lambda: JuiceboxMITM_SendProtocol(data, self.handler, on_con_lost),
-            remote_addr=addr,
+            remote_addr=to_addr,
+        )
+
+        try:
+            await on_con_lost
+        finally:
+            udp_send.close()
+
+    async def send_data_to_juicebox(self, data: bytes):
+        # logger.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")
+        if data is None or self.client_address is None:
+            return None
+        on_con_lost = self.loop.create_future()
+
+        logger.debug(f"Sending to Juicebox ({self.client_address}): {data}")
+        udp_send, _ = await self.loop.create_datagram_endpoint(
+            lambda: JuiceboxMITM_SendProtocol(data, self.handler, on_con_lost),
+            remote_addr=self.client_address,
         )
 
         try:
@@ -219,11 +258,11 @@ class JuiceboxMITM:
         else:
             logger.warning(f"JuiceboxMITM Unknown address: {from_addr}")
 
-    def set_local_data_handler(self, x):
+    async def set_local_data_handler(self, x):
         # logger.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")
         self.local_data_handler = x
 
-    def set_remote_data_handler(self, x):
+    async def set_remote_data_handler(self, x):
         # logger.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")
         self.remote_data_handler = x
 
