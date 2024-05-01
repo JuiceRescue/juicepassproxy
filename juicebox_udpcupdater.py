@@ -10,7 +10,7 @@ class JuiceboxUDPCUpdater:
     def __init__(
         self,
         juicebox_host,
-        udpc_host,
+        jpp_host,
         udpc_port=8047,
         telnet_timeout=None,
         loglevel=None,
@@ -19,7 +19,7 @@ class JuiceboxUDPCUpdater:
         if loglevel is not None:
             logger.setLevel(loglevel)
         self.juicebox_host = juicebox_host
-        self.udpc_host = udpc_host
+        self.jpp_host = jpp_host
         self.udpc_port = udpc_port
         self.interval = 30
         self.run_event = True
@@ -65,7 +65,7 @@ class JuiceboxUDPCUpdater:
                 for i, connection in enumerate(connections):
                     if connection["type"] == "UDPC":
                         udpc_streams_to_close.update({int(connection["id"]): i})
-                        if self.udpc_host not in connection["dest"]:
+                        if self.jpp_host not in connection["dest"]:
                             udpc_stream_to_update = int(connection["id"])
                 # logger.debug(f"udpc_streams_to_close: {udpc_streams_to_close}")
                 if udpc_stream_to_update == 0 and len(udpc_streams_to_close) > 0:
@@ -79,7 +79,7 @@ class JuiceboxUDPCUpdater:
                 if len(udpc_streams_to_close) == 0:
                     logger.info("UDPC IP not found, updating")
                 elif (
-                    self.udpc_host
+                    self.jpp_host
                     not in connections[udpc_streams_to_close[udpc_stream_to_update]][
                         "dest"
                     ]
@@ -93,7 +93,7 @@ class JuiceboxUDPCUpdater:
                     for id in udpc_streams_to_close:
                         logger.debug(f"Closing UDPC stream: {id}")
                         await self._telnet.stream_close(id)
-                    await self._telnet.write_udpc(self.udpc_host, self.udpc_port)
+                    await self._telnet.write_udpc(self.jpp_host, self.udpc_port)
                     await self._telnet.save()
                     logger.info("UDPC IP Saved")
             except ConnectionResetError as e:

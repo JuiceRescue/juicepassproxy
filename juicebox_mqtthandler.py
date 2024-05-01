@@ -141,6 +141,8 @@ class JuiceboxMQTTText(JuiceboxMQTTEntity):
         if self.kwargs.get("initial_text", None) is not None:
             # logger.debug("sending initial_text")
             await self.set_text(self.kwargs.get("initial_text", None))
+        else:
+            await self.set_text(self.name)
         logger.debug(f"Started Text: {self.name}. MQTT: {self._mqtt}")
 
     async def set_state(self, state=None):
@@ -172,9 +174,7 @@ class JuiceboxMQTTText(JuiceboxMQTTEntity):
             logger.debug(
                 f"Cannot send to MITM. mitm_handler type: {type(self._mitm_handler)}"
             )
-        # do_some_custom_thing(text)
-        # Send an MQTT message to confirm to HA that the text was changed
-        # await self.set_text(text)
+        await self.set_text(text)
 
 
 class JuiceboxMQTTHandler:
@@ -194,6 +194,8 @@ class JuiceboxMQTTHandler:
         self.device_name = device_name
         self.juicebox_id = juicebox_id
         self._mitm_handler = mitm_handler
+        self.experimental = experimental
+
         self.device_info = DeviceInfo(
             name=self.device_name,
             identifiers=(
@@ -213,7 +215,6 @@ class JuiceboxMQTTHandler:
             sw_version=VERSION,
             via_device="JuicePass Proxy",
         )
-        self.experimental = experimental
         self.entities = {
             "status": JuiceboxMQTTSensor(
                 name="Status",
@@ -231,8 +232,6 @@ class JuiceboxMQTTHandler:
                 device_class="current",
                 unit_of_measurement="A",
             ),
-            # "current_max": JuiceboxMQTTNumberEntity(name="Current Max", experimental=True,),
-            # "current_max_charging": JuiceboxMQTTNumberEntity(name="Current Max Charging", experimental=True,),
             "frequency": JuiceboxMQTTSensor(
                 name="Frequency",
                 state_class="measurement",
@@ -294,10 +293,8 @@ class JuiceboxMQTTHandler:
                 experimental=True,
                 enabled_by_default=False,
                 entity_category="diagnostic",
-                initial_text="Started",
             ),
         }
-        logger.debug(f"MQTT mitm_handler type: {type(self._mitm_handler)}")
         for entity in self.entities.values():
             # logger.debug(f"Adding extras to: {entity.name} (type: {entity.ent_type})")
             entity.add_kwargs(
@@ -325,8 +322,6 @@ class JuiceboxMQTTHandler:
             *gather_list,
             return_exceptions=True,
         )
-
-        # await self.basic_message_publish({"type": "debug", "debug_message": f"INFO: Starting JuicePass Proxy {VERSION}",})
 
     async def set_mitm_handler(self, mitm_handler):
         logger.debug(f"mitm_handler type: {type(mitm_handler)}")
@@ -472,7 +467,7 @@ class JuiceboxMQTTHandler:
                     e})"
             )
 
-    async def remote_data_handler(self, data):
+    async def remote_mitm_handler(self, data):
         # logger.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
 
         try:
@@ -492,7 +487,7 @@ class JuiceboxMQTTHandler:
                 f"Exception handling remote data. ({e.__class__.__qualname__}: {e})"
             )
 
-    async def local_data_handler(self, data):
+    async def local_mitm_handler(self, data):
         # logger.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
         message = None
         try:

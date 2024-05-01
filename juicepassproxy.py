@@ -15,13 +15,13 @@ from aiorun import run
 from const import (
     CONF_YAML,
     DEFAULT_DEVICE_NAME,
-    DEFAULT_DST,
+    DEFAULT_ENELX_IP,
     DEFAULT_ENELX_PORT,
     DEFAULT_ENELX_SERVER,
+    DEFAULT_LOCAL_IP,
     DEFAULT_MQTT_DISCOVERY_PREFIX,
     DEFAULT_MQTT_HOST,
     DEFAULT_MQTT_PORT,
-    DEFAULT_SRC,
     DEFAULT_TELNET_TIMEOUT,
     EXTERNAL_DNS,
     VERSION,
@@ -58,7 +58,7 @@ logging.basicConfig(
     level=logging.INFO,
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("/logs/juicepassproxy.log", mode="w"),
+        logging.FileHandler("/logs/juicepassproxy.log", mode="a"),
     ],
 )
 logger = logging.getLogger(__name__)
@@ -201,16 +201,20 @@ async def main():
     arg_src = parser.add_argument(
         "-s",
         "--src",
+        "--local",
+        dest="local",
         required=False,
         type=str,
-        help="Source IP (and optional port). If not defined, will obtain it automatically. (Ex. 127.0.0.1:8047)",
+        help="Local IP (and optional port). If not defined, will obtain it automatically. (Ex. 127.0.0.1:8047)",
     )
     parser.add_argument(
         "-d",
         "--dst",
+        "--enelx",
+        dest="enelx",
         required=False,
         type=str,
-        help="Destination IP (and optional port) of EnelX Server. If not defined, --juicebox_host required and then will obtain it automatically. (Ex. 127.0.0.1:8047)",
+        help="Destination IP (and optional port) of EnelX Server. If not defined, --juicebox_host required and then will obtain it automatically. (Ex. 54.161.185.130:8047)",
     )
     parser.add_argument(
         "--ignore_remote",
@@ -269,14 +273,16 @@ async def main():
     arg_juicebox_host = parser.add_argument(
         "--juicebox_host",
         type=str,
-        help="Host or IP address of the JuiceBox. Required for --update_udpc or if --dst not defined.",
+        help="Host or IP address of the JuiceBox. Required for --update_udpc or if --enelx not defined.",
     )
     parser.add_argument(
         "--juicepass_proxy_host",
+        "--jpp_host",
+        dest="jpp_host",
         type=str,
         help="EXTERNAL host or IP address of the machine running JuicePass"
         " Proxy. Optional: only necessary when using --update_udpc and"
-        " it will be inferred from the address in --src if omitted.",
+        " it will be inferred from the address in --local if omitted.",
     )
     parser.add_argument(
         "--config_loc",
@@ -300,7 +306,7 @@ async def main():
     if args.update_udpc and not args.juicebox_host:
         raise argparse.ArgumentError(arg_juicebox_host, "juicebox_host is required")
 
-    if not args.dst and not args.juicebox_host:
+    if not args.enelx and not args.juicebox_host:
         raise argparse.ArgumentError(arg_juicebox_host, "juicebox_host is required")
 
     config_loc = Path(args.config_loc)
@@ -311,7 +317,7 @@ async def main():
     config = await load_config(config_loc)
 
     telnet_timeout = int(args.telnet_timeout)
-    logging.debug(f"telnet timeout: {telnet_timeout}")
+    logging.info(f"telnet timeout: {telnet_timeout}")
     if telnet_timeout == 0:
         telnet_timeout = None
 
@@ -330,37 +336,39 @@ async def main():
     logger.info(f"enelx_server: {enelx_server}")
     logger.info(f"enelx_port: {enelx_port}")
 
-    if args.src:
-        if ":" in args.src:
-            src = args.src
+    if args.local:
+        if ":" in args.local:
+            local_addr = args.local
         else:
-            src = f"{args.src}:{enelx_port}"
+            local_addr = f"{args.local}:{enelx_port}"
     elif local_ip := await get_local_ip():
-        src = f"{local_ip}:{enelx_port}"
+        local_addr = f"{local_ip}:{enelx_port}"
     else:
-        src = f"{config.get('SRC', DEFAULT_SRC)}:{enelx_port}"
-    config.update({"SRC": src.split(":")[0]})
-    logger.info(f"src: {src}")
+        local_addr = f"{config.get('LOCAL_IP', config.get('SRC', DEFAULT_LOCAL_IP))}:{
+            enelx_port}"
+    config.update({"LOCAL_IP": local_addr.split(":")[0]})
+    logger.info(f"local_addr: {local_addr}")
 
-    localhost_src = src.startswith("0.") or src.startswith("127")
-    if args.update_udpc and localhost_src and not args.juicepass_proxy_host:
+    localhost_src = local_addr.startswith("0.") or local_addr.startswith("127")
+    if args.update_udpc and localhost_src and not args.jpp_host:
         raise argparse.ArgumentError(
             arg_src,
-            "src must not be a local IP address for update_udpc to work, or"
+            "local must not be a localhost address (ex. 127.0.0.1) for update_udpc to work or"
             " --juicepass_proxy_host must be used.",
         )
 
-    if args.dst:
-        if ":" in args.dst:
-            dst = args.dst
+    if args.enelx:
+        if ":" in args.enelx:
+            enelx_addr = args.enelx
         else:
-            dst = f"{args.dst}:{enelx_port}"
+            enelx_addr = f"{args.enelx}:{enelx_port}"
     elif enelx_server_ip := await resolve_ip_external_dns(enelx_server):
-        dst = f"{enelx_server_ip}:{enelx_port}"
+        enelx_addr = f"{enelx_server_ip}:{enelx_port}"
     else:
-        dst = f"{config.get('DST', DEFAULT_DST)}:{enelx_port}"
-    config.update({"DST": dst.split(":")[0]})
-    logger.info(f"dst: {dst}")
+        enelx_addr = f"{config.get('ENELX_IP', config.get('DST', DEFAULT_ENELX_IP))}:{
+            enelx_port}"
+    config.update({"ENELX_IP": enelx_addr.split(":")[0]})
+    logger.info(f"enelx_addr: {enelx_addr}")
 
     if juicebox_id := args.juicebox_id:
         pass
@@ -389,7 +397,8 @@ async def main():
     else:
         ignore_remote = False
     logger.info(f"ignore_remote: {ignore_remote}")
-
+    config.pop("DST", None)
+    config.pop("SRC", None)
     await write_config(config, config_loc)
 
     gather_list = []
@@ -418,24 +427,24 @@ async def main():
     gather_list.append(asyncio.create_task(mqtt_handler.start()))
 
     mitm_handler = JuiceboxMITM(
-        src,  # Local/Docker IP
-        dst,  # EnelX IP
+        local_addr,  # Local/Docker IP
+        enelx_addr,  # EnelX IP
         ignore_remote=ignore_remote,
         loglevel=logger.getEffectiveLevel(),
     )
-    await mitm_handler.set_local_data_handler(mqtt_handler.local_data_handler)
-    await mitm_handler.set_remote_data_handler(mqtt_handler.remote_data_handler)
+    await mitm_handler.set_local_mitm_handler(mqtt_handler.local_mitm_handler)
+    await mitm_handler.set_remote_mitm_handler(mqtt_handler.remote_mitm_handler)
     gather_list.append(asyncio.create_task(mitm_handler.start()))
 
     await mqtt_handler.set_mitm_handler(mitm_handler)
-    mitm_handler.mqtt_handler = mqtt_handler
+    await mitm_handler.set_mqtt_handler(mqtt_handler)
 
     if args.update_udpc:
-        address = src.split(":")
-        jpp_host = args.juicepass_proxy_host or address[0]
+        address = local_addr.split(":")
+        jpp_host = args.jpp_host or address[0]
         udpc_updater = JuiceboxUDPCUpdater(
             juicebox_host=args.juicebox_host,
-            udpc_host=jpp_host,
+            jpp_host=jpp_host,
             udpc_port=address[1],
             telnet_timeout=telnet_timeout,
             loglevel=logger.getEffectiveLevel(),

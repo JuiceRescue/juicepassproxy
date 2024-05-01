@@ -19,13 +19,13 @@ send_bufsize: int | None = None
 class JuiceboxMITM_RecvProtocol(asyncio.DatagramProtocol):
     def __init__(
         self,
-        src_addr: tuple[str, int],
-        dst_addr: tuple[str, int],
-        handler,
+        jpp_addr: tuple[str, int],
+        enelx_addr: tuple[str, int],
+        main_mitm_handler,
         on_con_lost: asyncio.Future[bool],
     ):
         # logger.debug(f"JuiceboxMITM_RecvProtocol Function: {sys._getframe().f_code.co_name}")
-        self.handler = handler
+        self.main_mitm_handler = main_mitm_handler
         self.on_con_lost = on_con_lost
         self.loop = asyncio.get_running_loop()
 
@@ -36,10 +36,12 @@ class JuiceboxMITM_RecvProtocol(asyncio.DatagramProtocol):
         addr = transport.get_extra_info("sockname")
         assert sock.getsockname() == addr
 
-    def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
-        self.loop.create_task(self.datagram_received_async(data, addr))
+    def datagram_received(self, data: bytes, from_addr: tuple[str, int]) -> None:
+        self.loop.create_task(self.datagram_received_async(data, from_addr))
 
-    async def datagram_received_async(self, data: bytes, addr: tuple[str, int]) -> None:
+    async def datagram_received_async(
+        self, data: bytes, from_addr: tuple[str, int]
+    ) -> None:
         # logger.debug(f"JuiceboxMITM_RecvProtocol Function: {sys._getframe().f_code.co_name}")
         assert self.transport
         sock = self.transport.get_extra_info("socket")
@@ -49,7 +51,7 @@ class JuiceboxMITM_RecvProtocol(asyncio.DatagramProtocol):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
 
         # logger.debug(f"JuiceboxMITM_RecvProtocol Recv: {data} from {addr}")
-        await self.handler(data, addr)
+        await self.main_mitm_handler(data, from_addr)
 
     def error_received(self, e: Exception | None) -> None:
         # logger.debug(f"JuiceboxMITM_RecvProtocol Function: {sys._getframe().f_code.co_name}")
@@ -65,18 +67,19 @@ class JuiceboxMITM_RecvProtocol(asyncio.DatagramProtocol):
                 f"JuiceboxMITM_RecvProtocol Connection Lost. ({e.__class__.__qualname__}: {
                     e})"
             )
-
         if not self.on_con_lost.cancelled():
             self.on_con_lost.set_result(True)
 
 
 class JuiceboxMITM_SendProtocol(asyncio.DatagramProtocol):
-    def __init__(self, data: bytes, handler, on_con_lost: asyncio.Future[bool]) -> None:
+    def __init__(
+        self, data: bytes, main_mitm_handler, on_con_lost: asyncio.Future[bool]
+    ) -> None:
         # logger.debug(f"JuiceboxMITM_SendProtocol Function: {sys._getframe().f_code.co_name}")
         self.data = data
         self.on_con_lost = on_con_lost
         self.transport: asyncio.DatagramTransport | None = None
-        self.handler = handler
+        self.main_mitm_handler = main_mitm_handler
         self.loop = asyncio.get_running_loop()
 
     def connection_made(self, transport: asyncio.DatagramTransport) -> None:
@@ -89,10 +92,12 @@ class JuiceboxMITM_SendProtocol(asyncio.DatagramProtocol):
         transport.sendto(self.data)
         # logger.debug(f"JuiceboxMITM_SendProtocol Sent: {self.data} to {addr}")
 
-    def datagram_received(self, data: bytes, addr: tuple[str, int]) -> None:
-        self.loop.create_task(self.datagram_received_async(data, addr))
+    def datagram_received(self, data: bytes, from_addr: tuple[str, int]) -> None:
+        self.loop.create_task(self.datagram_received_async(data, from_addr))
 
-    async def datagram_received_async(self, data: bytes, addr: tuple[str, int]) -> None:
+    async def datagram_received_async(
+        self, data: bytes, from_addr: tuple[str, int]
+    ) -> None:
         # logger.debug(f"JuiceboxMITM_SendProtocol Function: {sys._getframe().f_code.co_name}")
         assert self.transport
         sock = self.transport.get_extra_info("socket")
@@ -102,7 +107,7 @@ class JuiceboxMITM_SendProtocol(asyncio.DatagramProtocol):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
 
         # logger.debug(f"JuiceboxMITM_SendProtocol Recv: {data} from {addr}")
-        await self.handler(data, addr)
+        await self.main_mitm_handler(data, from_addr)
 
     def error_received(self, e: Exception | None) -> None:
         # logger.debug(f"JuiceboxMITM_SendProtocol Function: {sys._getframe().f_code.co_name}")
@@ -118,7 +123,6 @@ class JuiceboxMITM_SendProtocol(asyncio.DatagramProtocol):
                 f"JuiceboxMITM_SendProtocol Connection Lost. ({e.__class__.__qualname__}: {
                     e})"
             )
-
         if not self.on_con_lost.cancelled():
             self.on_con_lost.set_result(True)
 
@@ -126,44 +130,48 @@ class JuiceboxMITM_SendProtocol(asyncio.DatagramProtocol):
 class JuiceboxMITM:
     def __init__(
         self,
-        src_addr,
-        dst_addr,
-        local_data_handler=None,
+        jpp_addr,
+        enelx_addr,
+        local_mitm_handler=None,
         ignore_remote=False,
-        remote_data_handler=None,
+        remote_mitm_handler=None,
         mqtt_handler=None,
         loglevel=None,
     ):
         # logger.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")
         if loglevel is not None:
             logger.setLevel(loglevel)
-        self.src_addr = self.ip_to_tuple(src_addr)
-        self.dst_addr = self.ip_to_tuple(dst_addr)
+        self.jpp_addr = self.ip_to_tuple(jpp_addr)
+        self.enelx_addr = self.ip_to_tuple(enelx_addr)
         self.ignore_remote = ignore_remote
-        self.local_data_handler = local_data_handler
-        self.remote_data_handler = remote_data_handler
-        self.mqtt_handler = mqtt_handler
-        self.client_address = None
+        self.local_mitm_handler = local_mitm_handler
+        self.remote_mitm_handler = remote_mitm_handler
+        self._mqtt_handler = mqtt_handler
+        self.juicebox_addr = None
         self.loop = asyncio.get_running_loop()
 
     async def start(self) -> None:
         # logger.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")
         logger.info("Starting JuiceboxMITM")
-        logger.debug(f"Src: {self.src_addr[0]}:{self.src_addr[1]}")
-        logger.debug(f"Dst: {self.dst_addr[0]}:{self.dst_addr[1]}")
+        logger.debug(f"JPP: {self.jpp_addr[0]}:{self.jpp_addr[1]}")
+        logger.debug(f"EnelX: {self.enelx_addr[0]}:{self.enelx_addr[1]}")
 
         on_con_lost = self.loop.create_future()
         udp_mitm, _ = await self.loop.create_datagram_endpoint(
             lambda: JuiceboxMITM_RecvProtocol(
-                self.src_addr, self.dst_addr, self.handler, on_con_lost
+                self.jpp_addr, self.enelx_addr, self.main_mitm_handler, on_con_lost
             ),
-            local_addr=self.src_addr,
+            local_addr=self.jpp_addr,
             reuse_port=True,
         )
         try:
             await on_con_lost
         finally:
             udp_mitm.close()
+
+    async def set_mqtt_handler(self, mqtt_handler):
+        logger.debug(f"mqtt_handler type: {type(mqtt_handler)}")
+        self._mqtt_handler = mqtt_handler
 
     async def send_data(self, data: bytes, to_addr: tuple[str, int]):
         # logger.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")
@@ -173,10 +181,11 @@ class JuiceboxMITM:
 
         # logger.debug(f"sending: {data}, to: {addr}")
         udp_send, _ = await self.loop.create_datagram_endpoint(
-            lambda: JuiceboxMITM_SendProtocol(data, self.handler, on_con_lost),
+            lambda: JuiceboxMITM_SendProtocol(
+                data, self.main_mitm_handler, on_con_lost
+            ),
             remote_addr=to_addr,
         )
-
         try:
             await on_con_lost
         finally:
@@ -184,73 +193,57 @@ class JuiceboxMITM:
 
     async def send_data_to_juicebox(self, data: bytes):
         # logger.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")
-        if data is None or self.client_address is None:
+        if data is None or self.juicebox_addr is None:
             return None
         on_con_lost = self.loop.create_future()
 
-        logger.debug(f"Sending to Juicebox ({self.client_address}): {data}")
+        logger.debug(f"Sending to Juicebox: {data} to: {self.juicebox_addr}")
         udp_send, _ = await self.loop.create_datagram_endpoint(
-            lambda: JuiceboxMITM_SendProtocol(data, self.handler, on_con_lost),
-            remote_addr=self.client_address,
+            lambda: JuiceboxMITM_SendProtocol(
+                data, self.main_mitm_handler, on_con_lost
+            ),
+            remote_addr=self.juicebox_addr,
         )
-
         try:
             await on_con_lost
         finally:
             udp_send.close()
 
-    async def send_data_to_local_address(self, data: bytes):
-        # logger.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")
-        if data is None:
-            return None
-        on_con_lost = self.loop.create_future()
-
-        # logger.debug(f"sending: {data}, to: {addr}")
-        udp_send, _ = await self.loop.create_datagram_endpoint(
-            lambda: JuiceboxMITM_SendProtocol(data, self.handler, on_con_lost),
-            remote_addr=self.client_address,
-        )
-
-        try:
-            await on_con_lost
-        finally:
-            udp_send.close()
-
-    async def handler(self, data: bytes, from_addr: tuple[str, int]):
+    async def main_mitm_handler(self, data: bytes, from_addr: tuple[str, int]):
         # logger.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")
         if data is None or from_addr is None:
             return None
 
-        if from_addr[0] != self.dst_addr[0]:
-            self.client_address = from_addr
-            # logger.debug(f"self.client_address: {self.client_address}")
+        if from_addr[0] != self.enelx_addr[0]:
+            self.juicebox_addr = from_addr
+            # logger.debug(f"self.juicebox_addr: {self.juicebox_addr}")
 
-        if from_addr == self.client_address:
-            data = await self.local_data_handler(data)
+        if from_addr == self.juicebox_addr:
+            data = await self.local_mitm_handler(data)
             if not self.ignore_remote:
                 try:
-                    await self.send_data(data, self.dst_addr)
+                    await self.send_data(data, self.enelx_addr)
                 except OSError as e:
                     logger.warning(
                         f"JuiceboxMITM OSError {
-                            errno.errorcode[e.errno]} [{self.dst_addr}]: {e}"
+                            errno.errorcode[e.errno]} [{self.enelx_addr}]: {e}"
                     )
-                    await self.local_data_handler(
-                        f"JuiceboxMITM_OSERROR|server|{self.dst_addr}|{
+                    await self.local_mitm_handler(
+                        f"JuiceboxMITM_OSERROR|server|{self.enelx_addr}|{
                             errno.errorcode[e.errno]}|{e}"
                     )
-        elif self.client_address is not None and from_addr == self.dst_addr:
+        elif self.juicebox_addr is not None and from_addr == self.enelx_addr:
             if not self.ignore_remote:
-                data = await self.remote_data_handler(data)
+                data = await self.remote_mitm_handler(data)
                 try:
-                    await self.send_data(data, self.client_address)
+                    await self.send_data(data, self.juicebox_addr)
                 except OSError as e:
                     logger.warning(
                         f"JuiceboxMITM OSError {
-                            errno.errorcode[e.errno]} [{self.client_address}]: {e}"
+                            errno.errorcode[e.errno]} [{self.juicebox_addr}]: {e}"
                     )
-                    await self.local_data_handler(
-                        f"JuiceboxMITM_OSERROR|client|{self.client_address}|{
+                    await self.local_mitm_handler(
+                        f"JuiceboxMITM_OSERROR|client|{self.juicebox_addr}|{
                             errno.errorcode[e.errno]}|{e}"
                     )
             else:
@@ -258,13 +251,13 @@ class JuiceboxMITM:
         else:
             logger.warning(f"JuiceboxMITM Unknown address: {from_addr}")
 
-    async def set_local_data_handler(self, x):
+    async def set_local_mitm_handler(self, x):
         # logger.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")
-        self.local_data_handler = x
+        self.local_mitm_handler = x
 
-    async def set_remote_data_handler(self, x):
+    async def set_remote_mitm_handler(self, x):
         # logger.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")
-        self.remote_data_handler = x
+        self.remote_mitm_handler = x
 
     def ip_to_tuple(self, ip):
         """Parse IP string and return (ip, port) tuple.
