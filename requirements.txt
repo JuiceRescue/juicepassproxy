@@ -4,3 +4,4 @@ dnspython >= 2.0.0
 pyyaml
 telnetlib3
 aiorun
+asyncio-dgram
