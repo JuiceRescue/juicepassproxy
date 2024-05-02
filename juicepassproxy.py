@@ -203,6 +203,13 @@ async def write_config(config, config_loc):
     return False
 
 
+def ip_to_tuple(ip):
+    if isinstance(ip, tuple):
+        return ip
+    ip, port = ip.split(":")
+    return (ip, int(port))
+
+
 async def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -355,21 +362,23 @@ async def main():
 
     if args.local_ip:
         if ":" in args.local_ip:
-            local_addr = args.local_ip
+            local_addr = ip_to_tuple(args.local_ip)
         else:
-            local_addr = f"{args.local_ip}:{enelx_port}"
+            local_addr = ip_to_tuple(f"{args.local_ip}:{enelx_port}")
     elif local_ip := await get_local_ip():
-        local_addr = f"{local_ip}:{enelx_port}"
+        local_addr = ip_to_tuple(f"{local_ip}:{enelx_port}")
     else:
-        local_addr = f"{config.get('LOCAL_IP', config.get('SRC', DEFAULT_LOCAL_IP))}:{
-            enelx_port}"
-    config.update({"LOCAL_IP": local_addr.split(":")[0]})
+        local_addr = ip_to_tuple(
+            f"{config.get('LOCAL_IP', config.get('SRC', DEFAULT_LOCAL_IP))}:{
+                enelx_port}"
+        )
+    config.update({"LOCAL_IP": local_addr[0]})
     _LOGGER.info(f"local_addr: {local_addr}")
 
     localhost_check = (
-        local_addr.startswith("0.")
-        or local_addr.startswith("127")
-        or "localhost" in local_addr
+        local_addr[0].startswith("0.")
+        or local_addr[0].startswith("127")
+        or "localhost" in local_addr[0]
     )
     if args.update_udpc and localhost_check and not args.jpp_host:
         raise argparse.ArgumentError(
@@ -380,15 +389,17 @@ async def main():
 
     if args.enelx_ip:
         if ":" in args.enelx_ip:
-            enelx_addr = args.enelx_ip
+            enelx_addr = ip_to_tuple(args.enelx_ip)
         else:
-            enelx_addr = f"{args.enelx_ip}:{enelx_port}"
+            enelx_addr = ip_to_tuple(f"{args.enelx_ip}:{enelx_port}")
     elif enelx_server_ip := await resolve_ip_external_dns(enelx_server):
-        enelx_addr = f"{enelx_server_ip}:{enelx_port}"
+        enelx_addr = ip_to_tuple(f"{enelx_server_ip}:{enelx_port}")
     else:
-        enelx_addr = f"{config.get('ENELX_IP', config.get('DST', DEFAULT_ENELX_IP))}:{
-            enelx_port}"
-    config.update({"ENELX_IP": enelx_addr.split(":")[0]})
+        enelx_addr = ip_to_tuple(
+            f"{config.get('ENELX_IP', config.get('DST', DEFAULT_ENELX_IP))}:{
+                enelx_port}"
+        )
+    config.update({"ENELX_IP": enelx_addr[0]})
     _LOGGER.info(f"enelx_addr: {enelx_addr}")
 
     if juicebox_id := args.juicebox_id:
@@ -458,12 +469,11 @@ async def main():
     await mitm_handler.set_mqtt_handler(mqtt_handler)
 
     if args.update_udpc:
-        address = local_addr.split(":")
-        jpp_host = args.jpp_host or address[0]
+        jpp_host = args.jpp_host or local_addr[0]
         udpc_updater = JuiceboxUDPCUpdater(
             juicebox_host=args.juicebox_host,
             jpp_host=jpp_host,
-            udpc_port=address[1],
+            udpc_port=local_addr[1],
             telnet_timeout=telnet_timeout,
             loglevel=_LOGGER.getEffectiveLevel(),
         )

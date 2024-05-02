@@ -25,8 +25,8 @@ class JuiceboxMITM:
     ):
         if loglevel is not None:
             _LOGGER.setLevel(loglevel)
-        self._jpp_addr = self._ip_to_tuple(jpp_addr)
-        self._enelx_addr = self._ip_to_tuple(enelx_addr)
+        self._jpp_addr = jpp_addr
+        self._enelx_addr = enelx_addr
         self._juicebox_addr = None
         self._ignore_remote = ignore_remote
         self._local_mitm_handler = local_mitm_handler
@@ -150,7 +150,3 @@ class JuiceboxMITM:
 
     async def set_remote_mitm_handler(self, remote_mitm_handler):
         self._remote_mitm_handler = remote_mitm_handler
-
-    def _ip_to_tuple(self, ip):
-        ip, port = ip.split(":")
-        return (ip, int(port))
