@@ -724,9 +724,9 @@ def main():
         address = src.split(":")
         jpp_host = args.juicepass_proxy_host or address[0]
         udpc_updater = JuiceboxUDPCUpdater(
-            args.juicebox_host,
-            juicebox_host=jpp_host,
-            udpc_host=address[1],
+            juicebox_host=args.juicebox_host,
+            udpc_host=jpp_host,
+            udpc_port=address[1],
             telnet_timeout=telnet_timeout,
         )
         udpc_updater_thread = Thread(target=udpc_updater.start)
