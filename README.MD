@@ -13,13 +13,13 @@ _Hopefully we won't need this if EnelX fixes their API!_
 ## Docker Compose Installation
 
 ### Features
-*  If JuiceBox Local IP is defined, it will run a telnet script to get the EnelX Server and Port as well as the JuiceBox ID.
+*  If `JUICEBOX_HOST` is defined, it will run a telnet script to get the EnelX Server and Port as well as the JuiceBox ID.
 
-*  If DST is not defined, it will use `dig` with the CloudFlare DNS (1.1.1.1) to get the IP address of the EnelX Server and avoid a DNS lookup loop.
+*  If `ENELX_IP` is not defined, it will use the CloudFlare DNS (1.1.1.1) to get the IP address of the EnelX Server and avoid a DNS lookup loop.
 
-*  If SRC is not defined, it will use `ifconfig` to get the Local IP address of the Docker.
+*  If `LOCAL_IP` is not defined, it will lookup the Local IP address of the Docker.
 
-* If Update UDPC is true, JuicePass Proxy will continually update the JuiceBox via telnet to send its data to JuicePass Proxy. Use this if you are not able to change your DNS to route the JuiceBox traffic to JuicePass Proxy.
+* If `UPDATE_UDPC` is true, JuicePass Proxy will continually update the JuiceBox via telnet to send its data to JuicePass Proxy. Use this if you are not able to change your DNS to route the JuiceBox traffic to JuicePass Proxy.
 
 ### Instructions
 
@@ -34,13 +34,13 @@ _Hopefully we won't need this if EnelX fixes their API!_
       JPP_HOST=<IP address of the machine that the JuicePass Proxy Docker Container is running on>
       ```
 
-1. Add the `juicepassproxy` service to your Docker Compose file.
+1. Add the `juicepassproxy` container to your Docker Compose file.
 
-    A.  Set `ports:` to the port listed in the UDCP line _(see [Getting EnelX Server IPs](#getting-enelx-server-ips))_.
+    A.  Set `ports:` to the port listed in the UDCP line, likely `8047` _(see [Getting EnelX Server IPs](#getting-enelx-server-ips))_.
 
     B. Define the applicable environment variables _(see [Docker Environment Variables](#docker-environment-variables))_.
 
-    C. Specify the location for the config folder
+    C. Specify the location for the config and optionally the logs folder
 
 1. Start the Docker container.
 
@@ -76,6 +76,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./config:/config
+      - ./logs:/logs #Optional
 ```
 
 ### Docker Environment Variables
@@ -85,28 +86,37 @@ Variable | Required | Description & Default |
 **JUICEBOX_HOST** | **Recommended**</br></br>**Required if Update UDPC is True.** | If defined, it will attempt to get the EnelX Server and Port using Telnet. If unsuccessful, it will default to the EnelX Server and Port below.
 **UPDATE_UDPC** | No | Default: false. If true, will continually update the JuiceBox via telnet to point to JuicePass Proxy.
 **JPP_HOST**  | **Required if Update UDPC is True** |  This is the IP or Hostname of the machine where JuicePass Proxy is running (**not** the IP of the Docker Container)
-**SRC** | No | If not defined, it will attempt to get the Local Docker IP. If unsuccessful, it will default to 127.0.0.1.
-**DST** | No | If not defined, it will attempt to get the IP of the EnelX Server. If unsuccessful, it will default to 54.161.185.130. If manually defined, you should only use the IP address of the EnelX Server and not the fully qualified domain name to avoid DNS lookup loops.
-**JUICEBOX_ID**  | No | If not defined, it will attempt to get the JuiceBox ID using Telnet.  
 **MQTT_HOST** | No | 127.0.0.1
 **MQTT_PORT** | No | 1883
 **MQTT_USER** | No |
 **MQTT_PASS** | No |
 **MQTT_DISCOVERY_PREFIX** | No | homeassistant
+
+<details>
+<summary><h3>Less Common Docker Environment Variables</h3></summary>
+
+Variable | Required | Description & Default |
+-- | -- | --
 **DEVICE_NAME** | No | JuiceBox
 **DEBUG** | No | false
-
+**EXPERIMENTAL**  | No  | Default: false. Enables additional entities in Home Assistant that are in in development or can be used toward developing the ability to send commands to a JuiceBox
+**IGNORE_REMOTE**  | No  | Default: false. If true, will not send commands received from EnelX to the JuiceBox nor send outgoing information from the JuiceBox to EnelX
+**TELNET_TIMEOUT**  | No  | Default: 30. Timeout in seconds for telnet operations.
+**LOCAL_IP**<br>Deprecated Variable: SRC | No | If not defined, it will attempt to get the Local Docker IP. If unsuccessful, it will default to 127.0.0.1.
+**JUICEBOX_ID**  | No | If not defined, it will attempt to get the JuiceBox ID using Telnet.
+**ENELX_IP**<br>Deprecated Variable: DST | No | If not defined, it will attempt to get the IP of the EnelX Server. If unsuccessful, it will default to 54.161.185.130. If manually defined, you should only use the IP address of the EnelX Server and not the fully qualified domain name to avoid DNS lookup loops.
+</details>
 
 <details>
 <summary><h2>Manual Installation</h2></summary>
 
 1. Clone this repository
-2. Use Python 3.10-3.12 (I recommend setting up a virtual environment)
+2. Use Python 3.10+ (I recommend setting up a virtual environment)
 3. Install requirements `pip install -r requirements.txt`
 4. Launch by executing `python3 juicepassproxy.py --juicebox_host <IP of the JuiceBox> --mqtt_host <mqtt_host>` (params documented below)
 5. Nothing happens!
 6. Configure your DNS server running on your network (like Pi-hole or your router) to route all DNS requests from EnelX to the machine running this proxy. For me this was `juicenet-udp-prod3-usa.enelx.com`. See below for instructions to determine that.
-7. Alternatively to #6, you can enable `update_udpc` on the command line and set `juicebox_host` and the application will force publish the IP in the `src` argument to the Juicebox and avoid the need to set DNS rules on your router or DNS server. **NOTE: if you need to publish a different IP than the one in the `src` argument, you can make use of the `--juicepass_proxy_host` arg.**
+7. Alternatively to #6, you can enable `--update_udpc` on the command line and set `--juicebox_host` and the application will force publish the IP in the `--local_ip` argument to the JuiceBox and avoid the need to set DNS rules on your router or DNS server. **NOTE: if you need to publish a different IP than the one in the `--local_ip` argument, you can make use of the `--juicepass_proxy_host` arg.**
 
 ### CLI Options
 
@@ -148,13 +158,15 @@ options:
                         /~/.juicepassproxy)
 ```
 
-_For **DST**, you should only use the IP address of the EnelX Server and **not** the fully qualified domain name (FQDN) to avoid DNS lookup loops._
+_For **ENELX_IP**, you should only use the IP address of the EnelX Server and **not** the fully qualified domain name (FQDN) to avoid DNS lookup loops._
 
 </details>
 
+#### Deprecated Environment Variables and Command Line options will continue to work for now but will be removed at some point in the future.
+
 ## Getting EnelX Server IPs
 
-To get the destination IP:Port of the EnelX server, telnet to your Juicenet device:
+To get the destination IP:Port of the EnelX server, telnet into your JuiceBox device:
 `$ telnet 192.168.x.x 2000`
 and type the `list` command:
 

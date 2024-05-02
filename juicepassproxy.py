@@ -216,14 +216,14 @@ async def main():
         description=AP_DESCRIPTION,
     )
 
-    args_local = parser.add_argument(
+    arg_local = parser.add_argument(
         "--local_ip",
         "-s",
         "--src",
         dest="local_ip",
         required=False,
         type=str,
-        help="Local IP (and optional port). If not defined, will obtain it automatically. (Ex. 127.0.0.1:8047)",
+        help="Local IP (and optional port). If not defined, will obtain it automatically. (Ex. 127.0.0.1:8047) [Deprecated: -s --src]",
     )
     parser.add_argument(
         "--enelx_ip",
@@ -232,12 +232,12 @@ async def main():
         dest="enelx_ip",
         required=False,
         type=str,
-        help="Destination IP (and optional port) of EnelX Server. If not defined, --juicebox_host required and then will obtain it automatically. (Ex. 54.161.185.130:8047)",
+        help="Destination IP (and optional port) of EnelX Server. If not defined, --juicebox_host required and then will obtain it automatically. (Ex. 54.161.185.130:8047) [Deprecated: -d --dst]",
     )
     parser.add_argument(
         "--ignore_remote",
         action="store_true",
-        help="If set, will not send received commands to the JuiceBox nor send outging local commands to EnelX",
+        help="If set, will not send commands received from EnelX to the JuiceBox nor send outgoing information from the JuiceBox to EnelX",
     )
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("-u", "--mqtt_user", type=str, help="MQTT Username")
@@ -288,7 +288,7 @@ async def main():
         default=DEFAULT_TELNET_TIMEOUT,
         help="Timeout in seconds for Telnet operations (default: %(default)s)",
     )
-    args_juicebox_host = parser.add_argument(
+    arg_juicebox_host = parser.add_argument(
         "--juicebox_host",
         type=str,
         help="Host or IP address of the JuiceBox. Required for --update_udpc or if --enelx not defined.",
@@ -323,13 +323,13 @@ async def main():
     _LOGGER.info(f"Starting JuicePass Proxy {VERSION}")
     if args.update_udpc and not args.juicebox_host:
         raise argparse.ArgumentError(
-            args_juicebox_host,
+            arg_juicebox_host,
             "--update_udpc is set, thus --juicebox_host is required.",
         )
 
     if not args.enelx_ip and not args.juicebox_host:
         raise argparse.ArgumentError(
-            args_juicebox_host,
+            arg_juicebox_host,
             "--enelx_ip is not set, thus --juicebox_host is required.",
         )
 
@@ -382,7 +382,7 @@ async def main():
     )
     if args.update_udpc and localhost_check and not args.jpp_host:
         raise argparse.ArgumentError(
-            args_local,
+            arg_local,
             "When -- update_udpc is set, --local_ip must not be a localhost address (ex. 127.0.0.1) or "
             "--jpp_host must also be set.",
         )
