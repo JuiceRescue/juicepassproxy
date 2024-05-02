@@ -16,4 +16,5 @@ RUN pip install --root-user-action=ignore --no-cache-dir -r /juicepassproxy/requ
 COPY * /juicepassproxy
 RUN chmod -f +x /juicepassproxy/*.sh
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/juicepassproxy/docker_entrypoint.sh"]
+#ENTRYPOINT ["/usr/bin/tini", "--", "/juicepassproxy/docker_entrypoint.sh"]
+ENTRYPOINT ["/juicepassproxy/docker_entrypoint.sh"]

@@ -3,14 +3,11 @@ import logging
 
 import telnetlib3
 
-# import sys
-
 _LOGGER = logging.getLogger(__name__)
 
 
 class JuiceboxTelnet:
     def __init__(self, host, port=2000, timeout=None, loglevel=None):
-        # _LOGGER.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
         if loglevel is not None:
             _LOGGER.setLevel(loglevel)
         self.host = host
@@ -18,16 +15,13 @@ class JuiceboxTelnet:
         self.reader = None
         self.writer = None
         self.timeout = timeout
-        # _LOGGER.debug(f"self.timeout: {self.timeout}")
 
     async def __aenter__(self):
-        # _LOGGER.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
         if await self.open():
             return self
         return None
 
     async def __aexit__(self, exc_type, exc_value, exc_tb):
-        # _LOGGER.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
         if self.reader:
             self.reader.close()
         self.reader = None
@@ -36,7 +30,6 @@ class JuiceboxTelnet:
         self.writer = None
 
     async def readuntil(self, match: bytes):
-        # _LOGGER.debug(f"readuntil match: {match}")
         data = b""
         try:
             async with asyncio.timeout(self.timeout):
@@ -44,25 +37,28 @@ class JuiceboxTelnet:
         except asyncio.TimeoutError:
             _LOGGER.warning(f"TimeoutError: readuntil (match: {match}, data: {data})")
             raise
-            return data
+        except ConnectionResetError:
+            _LOGGER.warning(
+                "ConnectionResetError: readuntil (match: {match}, data: {data})"
+            )
+            raise
         # _LOGGER.debug(f"readuntil data: {data}")
         return data
 
     async def write(self, data: bytes):
-        # _LOGGER.debug(f"write data: {data}")
         try:
             async with asyncio.timeout(self.timeout):
-                # _LOGGER.debug(f"self.writer type check 2: {type(self.writer)}")
                 self.writer.write(data)
                 await self.writer.drain()
         except TimeoutError:
             _LOGGER.warning("TimeoutError: write (data: {data})")
             raise
-            return False
+        except ConnectionResetError:
+            _LOGGER.warning("ConnectionResetError: write (data: {data})")
+            raise
         return True
 
     async def open(self):
-        # _LOGGER.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
         if self.reader is None or self.writer is None:
             try:
                 async with asyncio.timeout(self.timeout):
@@ -73,12 +69,13 @@ class JuiceboxTelnet:
             except TimeoutError:
                 _LOGGER.warning("TimeoutError: Open Telnet Connection Failed")
                 raise
-                return False
+            except ConnectionResetError:
+                _LOGGER.warning("ConnectionResetError: Open Telnet Connection Failed")
+                raise
         # _LOGGER.debug("Telnet Opened")
         return True
 
-    async def list(self):
-        # _LOGGER.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
+    async def get_udpc_list(self):
         out = []
         if await self.open():
             await self.write(b"\n")
@@ -94,7 +91,6 @@ class JuiceboxTelnet:
         return out
 
     async def get_variable(self, variable) -> bytes:
-        # _LOGGER.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
         if await self.open():
             await self.write(b"\n")
             await self.readuntil(b"> ")
@@ -106,7 +102,6 @@ class JuiceboxTelnet:
         return None
 
     async def get_all(self):
-        # _LOGGER.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
         vars = {}
         if await self.open():
             await self.write(b"\n")
@@ -122,24 +117,21 @@ class JuiceboxTelnet:
                     vars[parts[0]] = parts[1]
         return vars
 
-    async def stream_close(self, id):
-        # _LOGGER.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
+    async def close_udpc_stream(self, id):
         if await self.open():
             await self.write(b"\n")
             await self.readuntil(b">")
             await self.write(f"stream_close {id}\n".encode("ascii"))
             await self.readuntil(b">")
 
-    async def write_udpc(self, host, port):
-        # _LOGGER.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
+    async def write_udpc_stream(self, host, port):
         if await self.open():
             await self.write(b"\n")
             await self.readuntil(b">")
             await self.write(f"udpc {host} {port}\n".encode("ascii"))
             await self.readuntil(b">")
 
-    async def save(self):
-        # _LOGGER.debug(f"JuiceboxTelnet Function: {sys._getframe().f_code.co_name}")
+    async def save_udpc(self):
         if await self.open():
             await self.write(b"\n")
             await self.readuntil(b">")

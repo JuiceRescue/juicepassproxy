@@ -5,8 +5,6 @@ import asyncio
 import ipaddress
 import logging
 import socket
-
-# import sys
 from pathlib import Path
 
 import dns
@@ -65,7 +63,6 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def get_local_ip():
-    # _LOGGER.debug(f"juicepassproxy Function: {sys._getframe().f_code.co_name}")
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -82,12 +79,12 @@ async def get_local_ip():
     except Exception as e:
         _LOGGER.warning(f"Unable to get Local IP. ({e.__class__.__qualname__}: {e})")
         local_ip = None
-    transport.close()
+    finally:
+        transport.close()
     return local_ip
 
 
 async def resolve_ip_external_dns(address, use_dns=EXTERNAL_DNS):
-    # _LOGGER.debug(f"juicepassproxy Function: {sys._getframe().f_code.co_name}")
     # res = await dns.asyncresolver.Resolver()
     res = dns.resolver.Resolver()
     res.nameservers = [use_dns]
@@ -110,7 +107,6 @@ async def resolve_ip_external_dns(address, use_dns=EXTERNAL_DNS):
 
 
 async def is_valid_ip(test_ip):
-    # _LOGGER.debug(f"juicepassproxy Function: {sys._getframe().f_code.co_name}")
     try:
         ipaddress.ip_address(test_ip)
     except ValueError:
@@ -119,22 +115,30 @@ async def is_valid_ip(test_ip):
 
 
 async def get_enelx_server_port(juicebox_host, telnet_timeout=None):
-    # _LOGGER.debug(f"juicepassproxy Function: {sys._getframe().f_code.co_name}")
     try:
         async with JuiceboxTelnet(
             juicebox_host,
             loglevel=_LOGGER.getEffectiveLevel(),
             timeout=telnet_timeout,
         ) as tn:
-            connections = await tn.list()
+            connections = await tn.get_udpc_list()
             # _LOGGER.debug(f"connections: {connections}")
             for connection in connections:
-                # _LOGGER.debug(f"connection['type']: {connection['type']}")
-                # _LOGGER.debug(f"connection['dest']: {connection['dest']}")
                 if connection["type"] == "UDPC" and not await is_valid_ip(
                     connection["dest"].split(":")[0]
                 ):
                     return connection["dest"]
+    except TimeoutError as e:
+        _LOGGER.warning(
+            f"Error in getting EnelX Server and Port via Telnet: ({
+                e.__class__.__qualname__}) {e}"
+        )
+        return None
+    except ConnectionResetError as e:
+        _LOGGER.warning(
+            f"Error in getting EnelX Server and Port via Telnet: ({
+                e.__class__.__qualname__}) {e}"
+        )
         return None
     # except Exception as e:
     #    _LOGGER.warning(
@@ -142,12 +146,10 @@ async def get_enelx_server_port(juicebox_host, telnet_timeout=None):
     #            e.__class__.__qualname__}) {e}"
     #    )
     #    return None
-    finally:
-        pass
+    return None
 
 
 async def get_juicebox_id(juicebox_host, telnet_timeout=None):
-    # _LOGGER.debug(f"juicepassproxy Function: {sys._getframe().f_code.co_name}")
     try:
         async with JuiceboxTelnet(
             juicebox_host,
@@ -156,18 +158,28 @@ async def get_juicebox_id(juicebox_host, telnet_timeout=None):
         ) as tn:
             juicebox_id = (await tn.get_variable("email.name_address")).decode("utf-8")
             return juicebox_id
+    except TimeoutError as e:
+        _LOGGER.warning(
+            f"Error in getting JuiceBox ID via Telnet: ({
+                e.__class__.__qualname__}) {e}"
+        )
+        return None
+    except ConnectionResetError as e:
+        _LOGGER.warning(
+            f"Error in getting JuiceBox ID via Telnet: ({
+                e.__class__.__qualname__}) {e}"
+        )
+        return None
     # except Exception as e:
     #    _LOGGER.warning(
     #        f"Error in getting JuiceBox ID via Telnet: ({
     #            e.__class__.__qualname__}) {e}"
     #    )
     #    return None
-    finally:
-        pass
+    return None
 
 
 async def load_config(config_loc):
-    # _LOGGER.debug(f"juicepassproxy Function: {sys._getframe().f_code.co_name}")
     config = {}
     try:
         with open(config_loc, "r") as file:
@@ -180,7 +192,6 @@ async def load_config(config_loc):
 
 
 async def write_config(config, config_loc):
-    # _LOGGER.debug(f"juicepassproxy Function: {sys._getframe().f_code.co_name}")
     try:
         with open(config_loc, "w") as file:
             yaml.dump(config, file)
@@ -193,25 +204,25 @@ async def write_config(config, config_loc):
 
 
 async def main():
-    # _LOGGER.debug(f"juicepassproxy Function: {sys._getframe().f_code.co_name}")
     parser = argparse.ArgumentParser(
-        formatter_class=argparse.RawDescriptionHelpFormatter, description=AP_DESCRIPTION
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=AP_DESCRIPTION,
     )
 
-    arg_src = parser.add_argument(
+    args_local = parser.add_argument(
+        "--local_ip",
         "-s",
         "--src",
-        "--local",
-        dest="local",
+        dest="local_ip",
         required=False,
         type=str,
         help="Local IP (and optional port). If not defined, will obtain it automatically. (Ex. 127.0.0.1:8047)",
     )
     parser.add_argument(
+        "--enelx_ip",
         "-d",
         "--dst",
-        "--enelx",
-        dest="enelx",
+        dest="enelx_ip",
         required=False,
         type=str,
         help="Destination IP (and optional port) of EnelX Server. If not defined, --juicebox_host required and then will obtain it automatically. (Ex. 54.161.185.130:8047)",
@@ -270,14 +281,14 @@ async def main():
         default=DEFAULT_TELNET_TIMEOUT,
         help="Timeout in seconds for Telnet operations (default: %(default)s)",
     )
-    arg_juicebox_host = parser.add_argument(
+    args_juicebox_host = parser.add_argument(
         "--juicebox_host",
         type=str,
         help="Host or IP address of the JuiceBox. Required for --update_udpc or if --enelx not defined.",
     )
     parser.add_argument(
-        "--juicepass_proxy_host",
         "--jpp_host",
+        "--juicepass_proxy_host",
         dest="jpp_host",
         type=str,
         help="EXTERNAL host or IP address of the machine running JuicePass"
@@ -290,7 +301,6 @@ async def main():
         default=Path.home().joinpath(".juicepassproxy"),
         help="The location to store the config file  (default: %(default)s)",
     )
-
     parser.add_argument(
         "--experimental",
         action="store_true",
@@ -302,12 +312,19 @@ async def main():
     if args.debug:
         _LOGGER.setLevel(logging.DEBUG)
 
+    # _LOGGER.debug(f"args type: {type(args)}. args: {args}")
     _LOGGER.info(f"Starting JuicePass Proxy {VERSION}")
     if args.update_udpc and not args.juicebox_host:
-        raise argparse.ArgumentError(arg_juicebox_host, "juicebox_host is required")
+        raise argparse.ArgumentError(
+            args_juicebox_host,
+            "--update_udpc is set, thus --juicebox_host is required.",
+        )
 
-    if not args.enelx and not args.juicebox_host:
-        raise argparse.ArgumentError(arg_juicebox_host, "juicebox_host is required")
+    if not args.enelx_ip and not args.juicebox_host:
+        raise argparse.ArgumentError(
+            args_juicebox_host,
+            "--enelx_ip is not set, thus --juicebox_host is required.",
+        )
 
     config_loc = Path(args.config_loc)
     config_loc.mkdir(parents=True, exist_ok=True)
@@ -336,11 +353,11 @@ async def main():
     _LOGGER.info(f"enelx_server: {enelx_server}")
     _LOGGER.info(f"enelx_port: {enelx_port}")
 
-    if args.local:
-        if ":" in args.local:
-            local_addr = args.local
+    if args.local_ip:
+        if ":" in args.local_ip:
+            local_addr = args.local_ip
         else:
-            local_addr = f"{args.local}:{enelx_port}"
+            local_addr = f"{args.local_ip}:{enelx_port}"
     elif local_ip := await get_local_ip():
         local_addr = f"{local_ip}:{enelx_port}"
     else:
@@ -349,19 +366,23 @@ async def main():
     config.update({"LOCAL_IP": local_addr.split(":")[0]})
     _LOGGER.info(f"local_addr: {local_addr}")
 
-    localhost_src = local_addr.startswith("0.") or local_addr.startswith("127")
-    if args.update_udpc and localhost_src and not args.jpp_host:
+    localhost_check = (
+        local_addr.startswith("0.")
+        or local_addr.startswith("127")
+        or "localhost" in local_addr
+    )
+    if args.update_udpc and localhost_check and not args.jpp_host:
         raise argparse.ArgumentError(
-            arg_src,
-            "local must not be a localhost address (ex. 127.0.0.1) for update_udpc to work or"
-            " --juicepass_proxy_host must be used.",
+            args_local,
+            "When -- update_udpc is set, --local_ip must not be a localhost address (ex. 127.0.0.1) or "
+            "--jpp_host must also be set.",
         )
 
-    if args.enelx:
-        if ":" in args.enelx:
-            enelx_addr = args.enelx
+    if args.enelx_ip:
+        if ":" in args.enelx_ip:
+            enelx_addr = args.enelx_ip
         else:
-            enelx_addr = f"{args.enelx}:{enelx_port}"
+            enelx_addr = f"{args.enelx_ip}:{enelx_port}"
     elif enelx_server_ip := await resolve_ip_external_dns(enelx_server):
         enelx_addr = f"{enelx_server_ip}:{enelx_port}"
     else:
@@ -397,17 +418,14 @@ async def main():
     else:
         ignore_remote = False
     _LOGGER.info(f"ignore_remote: {ignore_remote}")
+
+    # Remove DST and SRC from Config as they have been replaced by ENELX_IP and LOCAL_IP respectively
     config.pop("DST", None)
     config.pop("SRC", None)
+
     await write_config(config, config_loc)
 
     gather_list = []
-
-    # try:
-    #    loop = asyncio.get_running_loop()
-    # except RuntimeError:
-    #    loop = asyncio.new_event_loop()
-    #    asyncio.set_event_loop(loop)
 
     mqtt_settings = Settings.MQTT(
         host=args.mqtt_host,
@@ -427,8 +445,8 @@ async def main():
     gather_list.append(asyncio.create_task(mqtt_handler.start()))
 
     mitm_handler = JuiceboxMITM(
-        local_addr,  # Local/Docker IP
-        enelx_addr,  # EnelX IP
+        jpp_addr=local_addr,  # Local/Docker IP
+        enelx_addr=enelx_addr,  # EnelX IP
         ignore_remote=ignore_remote,
         loglevel=_LOGGER.getEffectiveLevel(),
     )
@@ -456,9 +474,9 @@ async def main():
         return_exceptions=True,
     )
 
-    # loop.close()
     _LOGGER.debug("juicepassproxy: end of main")
 
 
 if __name__ == "__main__":
-    run(main(), stop_on_unhandled_errors=True)
+    # run(main(), stop_on_unhandled_errors=True)
+    asyncio.run(main())
