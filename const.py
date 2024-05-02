@@ -1,6 +1,10 @@
 CONF_YAML = "juicepassproxy.yaml"
 VERSION = "v0.2.0"
 
+LOGFILE = "juicepassproxy.log"
+LOG_FORMAT = "%(asctime)-20s %(levelname)-9s [%(name)s] %(message)s"
+LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
 # Defaults
 DEFAULT_ENELX_SERVER = "juicenet-udp-prod3-usa.enelx.com"
 DEFAULT_ENELX_PORT = "8047"

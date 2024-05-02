@@ -9,7 +9,7 @@ RUN pip install --root-user-action=ignore --no-cache-dir --upgrade pip
 RUN apt-get update && apt-get upgrade -y
 RUN apt-get install -y tini git curl
 RUN mkdir -p /juicepassproxy
-RUN mkdir -p /logs
+RUN mkdir -p /log
 RUN mkdir -p /config
 COPY * /juicepassproxy
 RUN pip install --root-user-action=ignore --no-cache-dir -r /juicepassproxy/requirements.txt

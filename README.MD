@@ -76,7 +76,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ./config:/config
-      - ./logs:/logs #Optional
+      - ./log:/log #Optional
 ```
 
 ### Docker Environment Variables

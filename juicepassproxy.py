@@ -22,6 +22,9 @@ from const import (
     DEFAULT_MQTT_PORT,
     DEFAULT_TELNET_TIMEOUT,
     EXTERNAL_DNS,
+    LOG_DATE_FORMAT,
+    LOG_FORMAT,
+    LOGFILE,
     VERSION,
 )
 from ha_mqtt_discoverable import Settings
@@ -29,6 +32,16 @@ from juicebox_mitm import JuiceboxMITM
 from juicebox_mqtthandler import JuiceboxMQTTHandler
 from juicebox_telnet import JuiceboxTelnet
 from juicebox_udpcupdater import JuiceboxUDPCUpdater
+
+logging.basicConfig(
+    format=LOG_FORMAT,
+    datefmt=LOG_DATE_FORMAT,
+    level=logging.INFO,
+    handlers=[
+        logging.StreamHandler(),
+    ],
+)
+_LOGGER = logging.getLogger(__name__)
 
 AP_DESCRIPTION = """
 JuicePass Proxy - by snicker
@@ -49,17 +62,6 @@ Run ping, nslookup, or similar command to determine the IP.
 
 As of November, 2023: juicenet-udp-prod3-usa.enelx.com = 54.161.185.130.
 """
-
-logging.basicConfig(
-    format="%(asctime)-20s %(levelname)-9s [%(name)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    level=logging.INFO,
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("/logs/juicepassproxy.log", mode="a"),
-    ],
-)
-_LOGGER = logging.getLogger(__name__)
 
 
 async def get_local_ip():
@@ -306,7 +308,13 @@ async def main():
         "--config_loc",
         type=str,
         default=Path.home().joinpath(".juicepassproxy"),
-        help="The location to store the config file  (default: %(default)s)",
+        help="The location to store the config file (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--log_loc",
+        type=str,
+        default=Path.home(),
+        help="The location to store the log files (default: %(default)s)",
     )
     parser.add_argument(
         "--experimental",
@@ -316,8 +324,22 @@ async def main():
 
     args = parser.parse_args()
 
+    log_loc = Path(args.log_loc)
+    log_loc.mkdir(parents=True, exist_ok=True)
+    log_loc = log_loc.joinpath(LOGFILE)
+    log_loc.touch(exist_ok=True)
+    logging.basicConfig(
+        format=LOG_FORMAT,
+        datefmt=LOG_DATE_FORMAT,
+        level=logging.INFO,
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(log_loc, mode="a"),
+        ],
+    )
     if args.debug:
         _LOGGER.setLevel(logging.DEBUG)
+    _LOGGER.info(f"log_loc: {log_loc}")
 
     # _LOGGER.debug(f"args type: {type(args)}. args: {args}")
     _LOGGER.info(f"Starting JuicePass Proxy {VERSION}")
