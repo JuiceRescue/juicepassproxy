@@ -67,10 +67,14 @@ class JuiceboxMITM:
 
     async def main_mitm_handler(self, data: bytes, from_addr: tuple[str, int]):
         # _LOGGER.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")
+
+        while self._stream.exception is not None:
+            pass
+
         if data is None or from_addr is None:
             return
 
-        _LOGGER.debug(f"JuiceboxMITM Recv: {data} from {from_addr}")
+        # _LOGGER.debug(f"JuiceboxMITM Recv: {data} from {from_addr}")
         if from_addr[0] != self.enelx_addr[0]:
             self.juicebox_addr = from_addr
 
@@ -121,7 +125,11 @@ class JuiceboxMITM:
             await asyncio.sleep(
                 max(blocking_time, 0.1)
             )  # Sleep for blocking time but at least 100 ms
-        _LOGGER.debug(f"JuiceboxMITM Sent: {data} to {to_addr}")
+
+        while self._stream.exception is not None:
+            pass
+
+        # _LOGGER.debug(f"JuiceboxMITM Sent: {data} to {to_addr}")
 
     async def send_data_to_juicebox(self, data: bytes):
         # _LOGGER.debug(f"JuiceboxMITM Function: {sys._getframe().f_code.co_name}")

@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import re
-import sys
 
 from const import VERSION
 from ha_mqtt_discoverable import DeviceInfo, Settings
@@ -9,7 +8,6 @@ from ha_mqtt_discoverable.sensors import Sensor, SensorInfo, Text, TextInfo
 from paho.mqtt.client import Client, MQTTMessage
 
 # import sys
-
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -108,12 +106,12 @@ class JuiceboxMQTTText(JuiceboxMQTTEntity):
         name,
         **kwargs,
     ):
-        _LOGGER.debug(f"Text Init: {name}")
+        # _LOGGER.debug(f"Text Init: {name}")
         self.ent_type = "text"
         super().__init__(name, **kwargs)
 
     async def start(self):
-        _LOGGER.debug(f"JuiceboxMQTTText Function: {sys._getframe().f_code.co_name}")
+        # _LOGGER.debug(f"JuiceboxMQTTText Function: {sys._getframe().f_code.co_name}")
 
         self.callback = self.kwargs.get("callback", self.default_callback)
 
@@ -143,7 +141,8 @@ class JuiceboxMQTTText(JuiceboxMQTTEntity):
             await self.set_text(self.kwargs.get("initial_text", None))
         else:
             await self.set_text(self.name)
-        _LOGGER.debug(f"Started Text: {self.name}. MQTT: {self._mqtt}")
+        # _LOGGER.debug(f"Started Text: {self.name}. MQTT: {self._mqtt}")
+        _LOGGER.debug(f"Started Text: {self.name}")
 
     async def set_state(self, state=None):
         await self.set_text(state)
@@ -324,15 +323,16 @@ class JuiceboxMQTTHandler:
         )
 
     async def set_mitm_handler(self, mitm_handler):
-        _LOGGER.debug(f"mitm_handler type: {type(mitm_handler)}")
+        # _LOGGER.debug(f"mitm_handler type: {type(mitm_handler)}")
 
         self._mitm_handler = mitm_handler
         for entity in self.entities.values():
             if entity.ent_type in ["text"]:
-                _LOGGER.debug(
-                    f"Adding mitm_handler ({type(self._mitm_handler)}) to: {
-                        entity.name} (type: {entity.ent_type})"
-                )
+                if self._mitm_handler is not None:
+                    _LOGGER.debug(
+                        f"Adding mitm_handler ({type(self._mitm_handler)}) to: {
+                            entity.name} (type: {entity.ent_type})"
+                    )
                 entity.add_kwargs(mitm_handler=mitm_handler)
 
     async def basic_message_parse(self, data: bytes):
