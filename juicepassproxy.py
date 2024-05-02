@@ -5,6 +5,7 @@ import asyncio
 import ipaddress
 import logging
 import socket
+import sys
 from pathlib import Path
 
 import dns
@@ -212,13 +213,13 @@ def ip_to_tuple(ip):
     return (ip, int(port))
 
 
-async def main():
+async def parse_args():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=AP_DESCRIPTION,
     )
 
-    arg_juicebox_host = parser.add_argument(
+    parser.add_argument(
         "--juicebox_host",
         type=str,
         metavar="HOST",
@@ -318,7 +319,7 @@ async def main():
         help="JuiceBox ID. If not defined, will obtain it automatically.",
         dest="juicebox_id",
     )
-    arg_local = parser.add_argument(
+    parser.add_argument(
         "--local_ip",
         "-s",
         "--src",
@@ -339,8 +340,11 @@ async def main():
         help="Destination IP (and optional port) of EnelX Server. If not defined, --juicebox_host required and then will obtain it automatically. (Ex. 54.161.185.130:8047) [Deprecated: -d --dst]",
     )
 
-    args = parser.parse_args()
+    return parser.parse_args()
 
+
+async def main():
+    args = await parse_args()
     log_loc = Path(args.log_loc)
     log_loc.mkdir(parents=True, exist_ok=True)
     log_loc = log_loc.joinpath(LOGFILE)
@@ -357,21 +361,25 @@ async def main():
     )
     if args.debug:
         _LOGGER.setLevel(logging.DEBUG)
-    _LOGGER.info(f"log_loc: {log_loc}")
-
-    # _LOGGER.debug(f"args type: {type(args)}. args: {args}")
     _LOGGER.info(f"Starting JuicePass Proxy {VERSION}")
-    if args.update_udpc and not args.juicebox_host:
-        raise argparse.ArgumentError(
-            arg_juicebox_host,
-            "--update_udpc is set, thus --juicebox_host is required.",
+    _LOGGER.info(f"log_loc: {log_loc}")
+    if len(sys.argv) == 1:
+        _LOGGER.error(
+            "Exiting: no command-line arguments given. Run with --help to see options."
         )
+        sys.exit(1)
 
-    if not args.enelx_ip and not args.juicebox_host:
-        raise argparse.ArgumentError(
-            arg_juicebox_host,
-            "--enelx_ip is not set, thus --juicebox_host is required.",
+    if len(sys.argv) > 1 and args.update_udpc and not args.juicebox_host:
+        _LOGGER.error(
+            "Exiting: --update_udpc is set, thus --juicebox_host is required.",
         )
+        sys.exit(1)
+
+    if len(sys.argv) > 1 and not args.enelx_ip and not args.juicebox_host:
+        _LOGGER.error(
+            "Exiting: --enelx_ip is not set, thus --juicebox_host is required.",
+        )
+        sys.exit(1)
 
     config_loc = Path(args.config_loc)
     config_loc.mkdir(parents=True, exist_ok=True)
@@ -413,7 +421,7 @@ async def main():
                 enelx_port}"
         )
     config.update({"LOCAL_IP": local_addr[0]})
-    _LOGGER.info(f"local_addr: {local_addr}")
+    _LOGGER.info(f"local_addr: {local_addr[0]}:{local_addr[1]}")
 
     localhost_check = (
         local_addr[0].startswith("0.")
@@ -421,11 +429,11 @@ async def main():
         or "localhost" in local_addr[0]
     )
     if args.update_udpc and localhost_check and not args.jpp_host:
-        raise argparse.ArgumentError(
-            arg_local,
-            "When -- update_udpc is set, --local_ip must not be a localhost address (ex. 127.0.0.1) or "
+        _LOGGER.error(
+            "Exiting: when --update_udpc is set, --local_ip must not be a localhost address (ex. 127.0.0.1) or "
             "--jpp_host must also be set.",
         )
+        sys.exit(1)
 
     if args.enelx_ip:
         if ":" in args.enelx_ip:
@@ -440,7 +448,7 @@ async def main():
                 enelx_port}"
         )
     config.update({"ENELX_IP": enelx_addr[0]})
-    _LOGGER.info(f"enelx_addr: {enelx_addr}")
+    _LOGGER.info(f"enelx_addr: {enelx_addr[0]}:{enelx_addr[1]}")
 
     if juicebox_id := args.juicebox_id:
         pass
