@@ -37,6 +37,7 @@ class JuiceboxMITM:
         self._run_mitm_loop = True
         self._sending_lock = asyncio.Lock()
         self._dgram = None
+        self._error_count = 0
 
     async def start(self) -> None:
         _LOGGER.info("Starting JuiceboxMITM")

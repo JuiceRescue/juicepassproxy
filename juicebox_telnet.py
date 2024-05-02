@@ -39,7 +39,7 @@ class JuiceboxTelnet:
             raise
         except ConnectionResetError:
             _LOGGER.warning(
-                "ConnectionResetError: readuntil (match: {match}, data: {data})"
+                f"ConnectionResetError: readuntil (match: {match}, data: {data})"
             )
             raise
         # _LOGGER.debug(f"readuntil data: {data}")
@@ -51,10 +51,10 @@ class JuiceboxTelnet:
                 self.writer.write(data)
                 await self.writer.drain()
         except TimeoutError:
-            _LOGGER.warning("TimeoutError: write (data: {data})")
+            _LOGGER.warning(f"TimeoutError: write (data: {data})")
             raise
         except ConnectionResetError:
-            _LOGGER.warning("ConnectionResetError: write (data: {data})")
+            _LOGGER.warning(f"ConnectionResetError: write (data: {data})")
             raise
         return True
 
@@ -101,7 +101,7 @@ class JuiceboxTelnet:
             return res[:-1].strip()
         return None
 
-    async def get_all(self):
+    async def get_all_variables(self):
         vars = {}
         if await self.open():
             await self.write(b"\n")

@@ -3,7 +3,6 @@ FROM python:3.12-slim-bookworm
 LABEL org.opencontainers.image.source=https://github.com/snicker/juicepassproxy
 
 ENV DEBUG=false
-ENV UPDATE_UDPC=false
 
 RUN pip install --root-user-action=ignore --no-cache-dir --upgrade pip
 RUN apt-get update && apt-get upgrade -y

@@ -25,6 +25,7 @@ class JuiceboxUDPCUpdater:
         self._run_udpc_update_loop = True
         self._udpc_update_loop_task = None
         self._telnet = None
+        self._error_count = 0
 
     async def start(self):
         _LOGGER.info("Starting JuiceboxUDPCUpdater")
@@ -43,17 +44,19 @@ class JuiceboxUDPCUpdater:
             try:
                 await self._telnet.open()
             except TimeoutError as e:
+                self._error_count += 1
                 _LOGGER.warning(
-                    "JuiceboxUDPCUpdater Telnet Timeout. Reconnecting."
-                    f"({e.__class__.__qualname__}: {e})"
+                    "JuiceboxUDPCUpdater Telnet Timeout. Reconnecting. "
+                    f"({e.__class__.__qualname__}: {e}) (Errors: {self._error_count})"
                 )
                 self._telnet = None
                 await self._connect()
                 pass
             except ConnectionResetError as e:
+                self._error_count += 1
                 _LOGGER.warning(
-                    "JuiceboxUDPCUpdater Telnet Connection Error. Reconnecting."
-                    f"({e.__class__.__qualname__}: {e})"
+                    "JuiceboxUDPCUpdater Telnet Connection Error. Reconnecting. "
+                    f"({e.__class__.__qualname__}: {e}) (Errors: {self._error_count})"
                 )
                 await self._connect()
                 pass
@@ -67,8 +70,9 @@ class JuiceboxUDPCUpdater:
         while self._run_udpc_update_loop:
             loop_interval = self._default_loop_interval
             if self._telnet is None:
+                self._error_count += 1
                 _LOGGER.warning(
-                    "JuiceboxUDPCUpdater Telnet Connection Lost. Reconnecting."
+                    "JuiceboxUDPCUpdater Telnet Connection Lost. Reconnecting. (Errors: {self._error_count})"
                 )
                 await self._connect()
                 continue
@@ -119,24 +123,27 @@ class JuiceboxUDPCUpdater:
                 await self._telnet.save_udpc()
                 _LOGGER.info("UDPC IP Saved")
         except ConnectionResetError as e:
+            self._error_count += 1
             _LOGGER.warning(
                 "Telnet connection to JuiceBox lost. "
                 "Nothing to worry about unless this happens a lot. "
-                f"({e.__class__.__qualname__}: {e})"
+                f"({e.__class__.__qualname__}: {e}) (Errors: {self._error_count})"
             )
             loop_interval = 3
         except TimeoutError as e:
+            self._error_count += 1
             _LOGGER.warning(
                 "Telnet connection to JuiceBox has timed out. "
                 "Nothing to worry about unless this happens a lot. "
-                f"({e.__class__.__qualname__}: {e})"
+                f"({e.__class__.__qualname__}: {e}) (Errors: {self._error_count})"
             )
             loop_interval = 3
         except OSError as e:
+            self._error_count += 1
             _LOGGER.warning(
                 "Could not route Telnet connection to JuiceBox. "
                 "Nothing to worry about unless this happens a lot. "
-                f"({e.__class__.__qualname__}: {e})"
+                f"({e.__class__.__qualname__}: {e}) (Errors: {self._error_count})"
             )
             loop_interval = 3
         # except Exception as e:

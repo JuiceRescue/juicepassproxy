@@ -218,36 +218,32 @@ async def main():
         description=AP_DESCRIPTION,
     )
 
-    arg_local = parser.add_argument(
-        "--local_ip",
-        "-s",
-        "--src",
-        dest="local_ip",
-        required=False,
+    arg_juicebox_host = parser.add_argument(
+        "--juicebox_host",
         type=str,
-        help="Local IP (and optional port). If not defined, will obtain it automatically. (Ex. 127.0.0.1:8047) [Deprecated: -s --src]",
+        metavar="HOST",
+        help="Host or IP address of the JuiceBox. Required for --update_udpc or if --enelx_ip not defined.",
     )
     parser.add_argument(
-        "--enelx_ip",
-        "-d",
-        "--dst",
-        dest="enelx_ip",
-        required=False,
-        type=str,
-        help="Destination IP (and optional port) of EnelX Server. If not defined, --juicebox_host required and then will obtain it automatically. (Ex. 54.161.185.130:8047) [Deprecated: -d --dst]",
-    )
-    parser.add_argument(
-        "--ignore_remote",
+        "--update_udpc",
         action="store_true",
-        help="If set, will not send commands received from EnelX to the JuiceBox nor send outgoing information from the JuiceBox to EnelX",
+        help="Update UDPC on the JuiceBox. Requires --juicebox_host",
     )
-    parser.add_argument("--debug", action="store_true")
-    parser.add_argument("-u", "--mqtt_user", type=str, help="MQTT Username")
-    parser.add_argument("-P", "--mqtt_password", type=str, help="MQTT Password")
+    parser.add_argument(
+        "--jpp_host",
+        "--juicepass_proxy_host",
+        dest="jpp_host",
+        type=str,
+        metavar="HOST",
+        help="EXTERNAL host or IP address of the machine running JuicePass "
+        "Proxy. Optional: only necessary when using --update_udpc and "
+        "it will be inferred from the address in --local_ip if omitted.",
+    )
     parser.add_argument(
         "-H",
         "--mqtt_host",
         type=str,
+        metavar="HOST",
         default=DEFAULT_MQTT_HOST,
         help="MQTT Hostname to connect to (default: %(default)s)",
     )
@@ -255,16 +251,38 @@ async def main():
         "-p",
         "--mqtt_port",
         type=int,
+        metavar="PORT",
         default=DEFAULT_MQTT_PORT,
         help="MQTT Port (default: %(default)s)",
+    )
+    parser.add_argument(
+        "-u", "--mqtt_user", type=str, help="MQTT Username", metavar="USER"
+    )
+    parser.add_argument(
+        "-P", "--mqtt_password", type=str, help="MQTT Password", metavar="PASSWORD"
     )
     parser.add_argument(
         "-D",
         "--mqtt_discovery_prefix",
         type=str,
+        metavar="PREFIX",
         dest="mqtt_discovery_prefix",
         default=DEFAULT_MQTT_DISCOVERY_PREFIX,
         help="Home Assistant MQTT topic prefix (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--config_loc",
+        type=str,
+        metavar="LOC",
+        default=Path.home().joinpath(".juicepassproxy"),
+        help="The location to store the config file (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--log_loc",
+        type=str,
+        metavar="LOC",
+        default=Path.home(),
+        help="The location to store the log files (default: %(default)s)",
     )
     parser.add_argument(
         "--name",
@@ -274,52 +292,51 @@ async def main():
         dest="device_name",
     )
     parser.add_argument(
-        "--juicebox_id",
-        type=str,
-        help="JuiceBox ID. If not defined, will obtain it automatically.",
-        dest="juicebox_id",
-    )
-    parser.add_argument(
-        "--update_udpc",
-        action="store_true",
-        help="Update UDPC on the JuiceBox. Requires --juicebox_host",
-    )
-    parser.add_argument(
-        "--telnet_timeout",
-        type=int,
-        default=DEFAULT_TELNET_TIMEOUT,
-        help="Timeout in seconds for Telnet operations (default: %(default)s)",
-    )
-    arg_juicebox_host = parser.add_argument(
-        "--juicebox_host",
-        type=str,
-        help="Host or IP address of the JuiceBox. Required for --update_udpc or if --enelx not defined.",
-    )
-    parser.add_argument(
-        "--jpp_host",
-        "--juicepass_proxy_host",
-        dest="jpp_host",
-        type=str,
-        help="EXTERNAL host or IP address of the machine running JuicePass"
-        " Proxy. Optional: only necessary when using --update_udpc and"
-        " it will be inferred from the address in --local if omitted.",
-    )
-    parser.add_argument(
-        "--config_loc",
-        type=str,
-        default=Path.home().joinpath(".juicepassproxy"),
-        help="The location to store the config file (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--log_loc",
-        type=str,
-        default=Path.home(),
-        help="The location to store the log files (default: %(default)s)",
+        "--debug", action="store_true", help="Show Debug level logging. (default: Info)"
     )
     parser.add_argument(
         "--experimental",
         action="store_true",
-        help="<Need to explain what this does>",
+        help="Enables additional entities in Home Assistant that are in in development or can be used toward developing the ability to send commands to a JuiceBox.",
+    )
+    parser.add_argument(
+        "--ignore_remote",
+        action="store_true",
+        help="If set, will not send commands received from EnelX to the JuiceBox nor send outgoing information from the JuiceBox to EnelX",
+    )
+    parser.add_argument(
+        "--telnet_timeout",
+        type=int,
+        metavar="SECONDS",
+        default=DEFAULT_TELNET_TIMEOUT,
+        help="Timeout in seconds for Telnet operations (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--juicebox_id",
+        type=str,
+        metavar="ID",
+        help="JuiceBox ID. If not defined, will obtain it automatically.",
+        dest="juicebox_id",
+    )
+    arg_local = parser.add_argument(
+        "--local_ip",
+        "-s",
+        "--src",
+        dest="local_ip",
+        required=False,
+        type=str,
+        metavar="IP",
+        help="Local IP (and optional port). If not defined, will obtain it automatically. (Ex. 127.0.0.1:8047) [Deprecated: -s --src]",
+    )
+    parser.add_argument(
+        "--enelx_ip",
+        "-d",
+        "--dst",
+        dest="enelx_ip",
+        required=False,
+        type=str,
+        metavar="IP",
+        help="Destination IP (and optional port) of EnelX Server. If not defined, --juicebox_host required and then will obtain it automatically. (Ex. 54.161.185.130:8047) [Deprecated: -d --dst]",
     )
 
     args = parser.parse_args()
@@ -336,6 +353,7 @@ async def main():
             logging.StreamHandler(),
             logging.FileHandler(log_loc, mode="a"),
         ],
+        force=True,
     )
     if args.debug:
         _LOGGER.setLevel(logging.DEBUG)
