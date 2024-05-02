@@ -22,7 +22,7 @@ jobs:
         run: echo "$GITHUB_CONTEXT"        
       - name: List variables
         run: |
-            echo "::group::List variables
+            echo "::group::List variables"
             echo "github.event_name: ${{ github.event_name }}"
             echo "github.ref_name: ${{ github.ref_name }}"
             echo "Default Branch: ${{ steps.branch-names.outputs.default_branch }}"
