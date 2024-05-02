@@ -26,13 +26,19 @@ if [[ ! -z "${JUICEBOX_ID}" ]]; then
   logger INFO "JUICEBOX_ID: ${JUICEBOX_ID}"
   JPP_STRING+=" --juicebox_id ${JUICEBOX_ID}"
 fi
-if [[ ! -z "${SRC}" ]]; then
-  logger INFO "SRC: ${SRC}"
-  JPP_STRING+=" --src ${SRC}"
+if [[ ! -z "${LOCAL_IP}" ]]; then
+  logger INFO "LOCAL_IP: ${LOCAL_IP}"
+  JPP_STRING+=" --local_ip ${LOCAL_IP}"
+elif [[ ! -z "${SRC}" ]]; then
+  logger INFO "LOCAL_IP: ${SRC}"
+  JPP_STRING+=" --local_ip ${SRC}"
 fi
-if [[ ! -z "${DST}" ]]; then
-  logger INFO "DST: ${DST}"
-  JPP_STRING+=" --dst ${DST}"
+if [[ ! -z "${ENELX_IP}" ]]; then
+  logger INFO "ENELX_IP: ${ENELX_IP}"
+  JPP_STRING+=" --enelx_ip ${ENELX_IP}"
+elif [[ ! -z "${DST}" ]]; then
+  logger INFO "ENELX_IP: ${DST}"
+  JPP_STRING+=" --enelx_ip ${DST}"
 fi
 if [[ ! -z "${MQTT_HOST}" ]]; then
   logger INFO "MQTT_HOST: ${MQTT_HOST}"
@@ -58,10 +64,6 @@ if [[ ! -z "${JPP_HOST}" ]]; then
   logger INFO "JPP_HOST: ${JPP_HOST}"
   JPP_STRING+=" --juicepass_proxy_host ${JPP_HOST}"
 fi
-logger INFO "UPDATE_UDPC: ${UPDATE_UDPC}"
-if $UPDATE_UDPC; then
-  JPP_STRING+=" --update_udpc"
-fi
 if [[ ! -z "${TELNET_TIMEOUT}" ]]; then
   logger INFO "TELNET_TIMEOUT: ${TELNET_TIMEOUT}"
   JPP_STRING+=" --telnet_timeout ${TELNET_TIMEOUT}"
@@ -71,6 +73,12 @@ JPP_STRING+=" --log_loc /log"
 logger INFO "DEBUG: ${DEBUG}"
 if $DEBUG; then
   JPP_STRING+=" --debug"
+fi
+if [[ -v UPDATE_UDPC ]] && $UPDATE_UDPC; then
+  JPP_STRING+=" --update_udpc"
+  logger INFO "UPDATE_UDPC: true"
+else
+  logger INFO "UPDATE_UDPC: false"
 fi
 if [[ -v IGNORE_REMOTE ]] && $IGNORE_REMOTE; then
   JPP_STRING+=" --ignore_remote"
