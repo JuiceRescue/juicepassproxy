@@ -11,7 +11,7 @@ from paho.mqtt.client import Client, MQTTMessage
 # import sys
 
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
 class JuiceboxMQTTEntity:
@@ -20,7 +20,7 @@ class JuiceboxMQTTEntity:
         name,
         **kwargs,
     ):
-        # logger.debug(f"Entity Init: {name}")
+        # _LOGGER.debug(f"Entity Init: {name}")
         self.name = name
         self.kwargs = kwargs
         self.unique_id = f"{self.kwargs.get("juicebox_id", None)} {self.name}"
@@ -31,7 +31,7 @@ class JuiceboxMQTTEntity:
         self.loop = asyncio.get_running_loop()
         self._mitm_handler = self.kwargs.get("mitm_handler", None)
         if self._mitm_handler:
-            logger.debug(f"mitm_handler type: {self._mitm_handler}")
+            _LOGGER.debug(f"mitm_handler type: {self._mitm_handler}")
 
     def add_kwargs(self, **kwargs):
         self.kwargs.update(kwargs)
@@ -39,14 +39,14 @@ class JuiceboxMQTTEntity:
         self.experimental = self.kwargs.get("experimental", False)
         self._mitm_handler = self.kwargs.get("mitm_handler", None)
         if self._mitm_handler:
-            logger.debug(f"mitm_handler type: {self._mitm_handler}")
+            _LOGGER.debug(f"mitm_handler type: {self._mitm_handler}")
 
     async def set_state(self, state=None):
         self.state = state
         try:
             self._mqtt.set_state(state)
         except AttributeError as e:
-            logger.warning(
+            _LOGGER.warning(
                 f"Can't update state for {
                     self.name} as MQTT isn't connected/started. ({e.__class__.__qualname__}: {e})"
             )
@@ -56,7 +56,7 @@ class JuiceboxMQTTEntity:
         try:
             self._mqtt.set_attributes(attr)
         except AttributeError as e:
-            logger.warning(
+            _LOGGER.warning(
                 f"Can't update attribtutes for {
                     self.name} as MQTT isn't connected/started. ({e.__class__.__qualname__}: {e})"
             )
@@ -69,12 +69,12 @@ class JuiceboxMQTTSensor(JuiceboxMQTTEntity):
         name,
         **kwargs,
     ):
-        # logger.debug(f"Sensor Init: {name}")
+        # _LOGGER.debug(f"Sensor Init: {name}")
         self.ent_type = "sensor"
         super().__init__(name, **kwargs)
 
     async def start(self):
-        # logger.debug(f"JuiceboxMQTTSensor Function: {sys._getframe().f_code.co_name}")
+        # _LOGGER.debug(f"JuiceboxMQTTSensor Function: {sys._getframe().f_code.co_name}")
 
         self._mqtt = Sensor(
             Settings(
@@ -98,7 +98,7 @@ class JuiceboxMQTTSensor(JuiceboxMQTTEntity):
 
         if self.kwargs.get("initial_state", None) is not None:
             await self.set_state(self.kwargs.get("initial_state", None))
-        # logger.debug(f"Started Sensor: {self.name}. MQTT: {self._mqtt}")
+        # _LOGGER.debug(f"Started Sensor: {self.name}. MQTT: {self._mqtt}")
 
 
 class JuiceboxMQTTText(JuiceboxMQTTEntity):
@@ -108,12 +108,12 @@ class JuiceboxMQTTText(JuiceboxMQTTEntity):
         name,
         **kwargs,
     ):
-        logger.debug(f"Text Init: {name}")
+        _LOGGER.debug(f"Text Init: {name}")
         self.ent_type = "text"
         super().__init__(name, **kwargs)
 
     async def start(self):
-        logger.debug(f"JuiceboxMQTTText Function: {sys._getframe().f_code.co_name}")
+        _LOGGER.debug(f"JuiceboxMQTTText Function: {sys._getframe().f_code.co_name}")
 
         self.callback = self.kwargs.get("callback", self.default_callback)
 
@@ -139,11 +139,11 @@ class JuiceboxMQTTText(JuiceboxMQTTEntity):
         )
 
         if self.kwargs.get("initial_text", None) is not None:
-            # logger.debug("sending initial_text")
+            # _LOGGER.debug("sending initial_text")
             await self.set_text(self.kwargs.get("initial_text", None))
         else:
             await self.set_text(self.name)
-        logger.debug(f"Started Text: {self.name}. MQTT: {self._mqtt}")
+        _LOGGER.debug(f"Started Text: {self.name}. MQTT: {self._mqtt}")
 
     async def set_state(self, state=None):
         await self.set_text(state)
@@ -152,9 +152,9 @@ class JuiceboxMQTTText(JuiceboxMQTTEntity):
         self.state = text
         try:
             self._mqtt.set_text(text)
-            logger.debug(f"Set Text ({self.name}): {text}")
+            _LOGGER.debug(f"Set Text ({self.name}): {text}")
         except AttributeError as e:
-            logger.warning(
+            _LOGGER.warning(
                 f"Can't update text for {
                     self.name} as MQTT isn't connected/started. ({e.__class__.__qualname__}: {e})"
             )
@@ -166,12 +166,12 @@ class JuiceboxMQTTText(JuiceboxMQTTEntity):
         self, client: Client, user_data, message: MQTTMessage
     ):
         text = message.payload.decode()
-        logger.info(f"Text Callback ({self.name}): {text}. User Data: {user_data}")
+        _LOGGER.info(f"Text Callback ({self.name}): {text}. User Data: {user_data}")
         if self._mitm_handler:
-            logger.debug(f"Sending to MITM: {text}")
-            await self._mitm_handler.send_data_to_juicebox(bytes(text, "utf-8"))
+            _LOGGER.debug(f"Sending to MITM: {text}")
+            await self._mitm_handler.send_data_to_juicebox(text.encode("utf-8"))
         else:
-            logger.debug(
+            _LOGGER.debug(
                 f"Cannot send to MITM. mitm_handler type: {type(self._mitm_handler)}"
             )
         await self.set_text(text)
@@ -187,9 +187,9 @@ class JuiceboxMQTTHandler:
         mitm_handler=None,
         loglevel=None,
     ):
-        # logger.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
+        # _LOGGER.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
         if loglevel is not None:
-            logger.setLevel(loglevel)
+            _LOGGER.setLevel(loglevel)
         self.mqtt_settings = mqtt_settings
         self.device_name = device_name
         self.juicebox_id = juicebox_id
@@ -296,27 +296,27 @@ class JuiceboxMQTTHandler:
             ),
         }
         for entity in self.entities.values():
-            # logger.debug(f"Adding extras to: {entity.name} (type: {entity.ent_type})")
+            # _LOGGER.debug(f"Adding extras to: {entity.name} (type: {entity.ent_type})")
             entity.add_kwargs(
                 juicebox_id=self.juicebox_id,
                 device_info=self.device_info,
                 mqtt_settings=self.mqtt_settings,
             )
             if entity.ent_type in ["text"]:
-                logger.debug(
+                _LOGGER.debug(
                     f"Adding mitm_handler ({type(self._mitm_handler)}) to: {
                         entity.name} (type: {entity.ent_type})"
                 )
                 entity.add_kwargs(mitm_handler=self._mitm_handler)
 
     async def start(self):
-        # logger.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
-        logger.info("Starting JuiceboxMQTTHandler")
+        # _LOGGER.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
+        _LOGGER.info("Starting JuiceboxMQTTHandler")
 
         gather_list = []
         for entity in self.entities.values():
             if entity.experimental is False or self.experimental is True:
-                # logger.debug(f"MQTT Gather: {entity.name}")
+                # _LOGGER.debug(f"MQTT Gather: {entity.name}")
                 gather_list.append(asyncio.create_task(entity.start()))
         await asyncio.gather(
             *gather_list,
@@ -324,19 +324,19 @@ class JuiceboxMQTTHandler:
         )
 
     async def set_mitm_handler(self, mitm_handler):
-        logger.debug(f"mitm_handler type: {type(mitm_handler)}")
+        _LOGGER.debug(f"mitm_handler type: {type(mitm_handler)}")
 
         self._mitm_handler = mitm_handler
         for entity in self.entities.values():
             if entity.ent_type in ["text"]:
-                logger.debug(
+                _LOGGER.debug(
                     f"Adding mitm_handler ({type(self._mitm_handler)}) to: {
                         entity.name} (type: {entity.ent_type})"
                 )
                 entity.add_kwargs(mitm_handler=mitm_handler)
 
     async def basic_message_parse(self, data: bytes):
-        # logger.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
+        # _LOGGER.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
         message = {"type": "basic"}
         message["current"] = 0
         message["energy_session"] = 0
@@ -412,7 +412,7 @@ class JuiceboxMQTTHandler:
         return message
 
     async def udp_mitm_oserror_message_parse(self, data):
-        # logger.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
+        # _LOGGER.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
         message = {"type": "udp_mitm_oserror"}
         err_data = str(data).split("|")
         message["status"] = "unavailable"
@@ -423,7 +423,7 @@ class JuiceboxMQTTHandler:
         return message
 
     async def debug_message_parse(self, data):
-        # logger.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
+        # _LOGGER.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
         message = {"type": "debug"}
         dbg_data = (
             str(data)
@@ -447,8 +447,8 @@ class JuiceboxMQTTHandler:
         return message
 
     async def basic_message_publish(self, message):
-        # logger.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
-        logger.debug(f"Publish {message.get('type').title()} Message: {message}")
+        # _LOGGER.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
+        _LOGGER.debug(f"Publish {message.get('type').title()} Message: {message}")
 
         try:
             attributes = {}
@@ -462,36 +462,36 @@ class JuiceboxMQTTHandler:
             if self.experimental and self.entities.get("local_data", None) is not None:
                 await self.entities.get("local_data").set_attributes(attributes)
         except Exception as e:
-            logger.exception(
+            _LOGGER.exception(
                 f"Failed to publish sensor data to MQTT. ({e.__class__.__qualname__}: {
                     e})"
             )
 
     async def remote_mitm_handler(self, data):
-        # logger.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
+        # _LOGGER.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
 
         try:
-            logger.debug(f"Remote: {data}")
+            _LOGGER.debug(f"Remote: {data}")
             if self.experimental and self.entities.get("remote_data", None) is not None:
                 await self.entities.get("remote_data").set_state(data.decode("utf-8"))
 
             return data
         except IndexError as e:
-            logger.warning(
+            _LOGGER.warning(
                 "Index error when handling remote data, probably wrong number of items in list. "
                 "Nothing to worry about unless this happens a lot. "
                 f"({e.__class__.__qualname__}: {e})"
             )
         except Exception as e:
-            logger.exception(
+            _LOGGER.exception(
                 f"Exception handling remote data. ({e.__class__.__qualname__}: {e})"
             )
 
     async def local_mitm_handler(self, data):
-        # logger.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
+        # _LOGGER.debug(f"JuiceboxMQTTHandler Function: {sys._getframe().f_code.co_name}")
         message = None
         try:
-            logger.debug(f"Local: {data}")
+            _LOGGER.debug(f"Local: {data}")
             if "JuiceboxMITM_OSERROR" in str(data):
                 message = await self.udp_mitm_oserror_message_parse(data)
             elif ":DBG," in str(data):
@@ -502,12 +502,12 @@ class JuiceboxMQTTHandler:
                 await self.basic_message_publish(message)
             return data
         except IndexError as e:
-            logger.warning(
+            _LOGGER.warning(
                 "Index error when handling local data, probably wrong number of items in list"
                 "Nothing to worry about unless this happens a lot. "
                 f"({e.__class__.__qualname__}: {e})"
             )
         except Exception as e:
-            logger.exception(
+            _LOGGER.exception(
                 f"Exception handling local data. ({e.__class__.__qualname__}: {e})"
             )
