@@ -12,28 +12,15 @@ jobs:
   build_and_publish_docker_image:
     if: github.repository_owner == 'snicker'
     runs-on: ubuntu-latest
-    steps:
-      - name: Get branch names
-        id: branch-names
-        uses: tj-actions/branch-names@v8
-      - name: GitHub Context
-        env:
-          GITHUB_CONTEXT: ${{ toJson(github) }}
-        run: echo "$GITHUB_CONTEXT"        
-      - name: List variables
+    steps:      
+      - name: Debug Variables
         run: |
-            echo "::group::List variables"
             echo "github.event_name: ${{ github.event_name }}"
             echo "github.ref_name: ${{ github.ref_name }}"
-            echo "Default Branch: ${{ steps.branch-names.outputs.default_branch }}"
-            echo "Current Branch: ${{ steps.branch-names.outputs.current_branch }}"
-            echo "Base Ref: ${{ steps.branch-names.outputs.base_ref_branch }}"
-            echo "Head Ref: ${{ steps.branch-names.outputs.head_ref_branch }}"
-            echo "Ref: ${{ steps.branch-names.outputs.ref_branch }}"
-            echo "Is Default: ${{ steps.branch-names.outputs.is_default }}"
-            echo "Is Tag: ${{ steps.branch-names.outputs.is_tag }}"
-            echo "Current tag: ${{ steps.branch-names.outputs.tag }}"
-            echo "::endgroup::"
+            echo "github.event.repository.default_branch: ${{ github.event.repository.default_branch }}"
+            echo "github.event.release.target_commitish: ${{ github.event.release.target_commitish }}"
+            echo "github.event.release.prerelease: ${{ github.event.release.prerelease }}"
+            echo "github.event.release.draft: ${{ github.event.release.draft }}"
       - name: Checkout
         uses: actions/checkout@v4.1.4
       - name: Set up QEMU
@@ -41,15 +28,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Update Version in const.py
-        if: ${{ github.event_name == 'release' && steps.branch-names.outputs.default_branch == github.ref_name }}
+        if: ${{ github.event_name == 'release' && github.event.repository.default_branch == github.event.release.target_commitish && github.event.release.prerelease == false && github.event.release.draft == false }}
         run: |
           sed -i 's/VERSION \= \".*\"/VERSION \= \"${{ github.ref_name }}\"/' ./const.py
       - name: Commit & Push Version Changes
-        if: ${{ github.event_name == 'release' && steps.branch-names.outputs.default_branch == github.ref_name }}
+        if: ${{ github.event_name == 'release' && github.event.repository.default_branch == github.event.release.target_commitish && github.event.release.prerelease == false && github.event.release.draft == false }}
         uses: actions-js/push@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ steps.branch-names.outputs.default_branch }}
+          branch: ${{ github.event.repository.default_branch }}
           message: "Updating to version ${{ github.ref_name }}"
       - name: Extract Docker metadata
         id: meta
