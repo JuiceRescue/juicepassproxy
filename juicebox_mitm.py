@@ -8,11 +8,10 @@ import time
 import asyncio_dgram_local as asyncio_dgram
 from const import (
     ERROR_LOOKBACK_MIN,
-    MAX_CONNECT_ATTEMPT,
     MAX_ERROR_COUNT,
+    MAX_RETRY_ATTEMPT,
     MITM_HANDLER_TIMEOUT,
     MITM_RECV_TIMEOUT,
-    MITM_SEND_DATA_RETRIES,
     MITM_SEND_DATA_TIMEOUT,
 )
 
@@ -68,13 +67,13 @@ class JuiceboxMITM:
         connect_attempt = 1
         while (
             self._dgram is None
-            and connect_attempt <= MAX_CONNECT_ATTEMPT
+            and connect_attempt <= MAX_RETRY_ATTEMPT
             and self._error_count < MAX_ERROR_COUNT
         ):
             if connect_attempt != 1:
                 _LOGGER.debug(
                     f"Retrying UDP Server Startup. Attempt {
-                        connect_attempt} of {MAX_CONNECT_ATTEMPT}"
+                        connect_attempt} of {MAX_RETRY_ATTEMPT}"
                 )
             connect_attempt += 1
             try:
@@ -191,10 +190,10 @@ class JuiceboxMITM:
     ):
         sent = False
         send_attempt = 1
-        while not sent and send_attempt <= MITM_SEND_DATA_RETRIES:
+        while not sent and send_attempt <= MAX_RETRY_ATTEMPT:
             if send_attempt != 1:
                 _LOGGER.warning(
-                    f"JuiceboxMITM Resending (Attempt: {send_attempt} of {MITM_SEND_DATA_RETRIES}): {
+                    f"JuiceboxMITM Resending (Attempt: {send_attempt} of {MAX_RETRY_ATTEMPT}): {
                         data} to {to_addr}"
                 )
             send_attempt += 1

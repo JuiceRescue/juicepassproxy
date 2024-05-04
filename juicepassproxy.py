@@ -18,6 +18,7 @@ from const import (
     DEFAULT_ENELX_PORT,
     DEFAULT_ENELX_SERVER,
     DEFAULT_LOCAL_IP,
+    DEFAULT_LOGLEVEL,
     DEFAULT_MQTT_DISCOVERY_PREFIX,
     DEFAULT_MQTT_HOST,
     DEFAULT_MQTT_PORT,
@@ -26,6 +27,7 @@ from const import (
     LOG_DATE_FORMAT,
     LOG_FORMAT,
     LOGFILE,
+    MAX_JPP_LOOP,
     VERSION,
 )
 from ha_mqtt_discoverable import Settings
@@ -37,14 +39,13 @@ from juicebox_udpcupdater import JuiceboxUDPCUpdater
 logging.basicConfig(
     format=LOG_FORMAT,
     datefmt=LOG_DATE_FORMAT,
-    level=logging.INFO,
+    level=DEFAULT_LOGLEVEL,
     handlers=[
         logging.StreamHandler(),
     ],
 )
 _LOGGER = logging.getLogger(__name__)
 
-MAX_LOOP_NUM = 10
 
 AP_DESCRIPTION = """
 JuicePass Proxy - by snicker
@@ -350,7 +351,7 @@ async def main():
     logging.basicConfig(
         format=LOG_FORMAT,
         datefmt=LOG_DATE_FORMAT,
-        level=logging.INFO,
+        level=DEFAULT_LOGLEVEL,
         handlers=[
             logging.StreamHandler(),
             logging.FileHandler(log_loc, mode="a"),
@@ -359,7 +360,10 @@ async def main():
     )
     if args.debug:
         _LOGGER.setLevel(logging.DEBUG)
-    _LOGGER.info(f"Starting JuicePass Proxy {VERSION}")
+    _LOGGER.warning(
+        f"Starting JuicePass Proxy {
+            VERSION} (Log Level: {logging.getLevelName(_LOGGER.getEffectiveLevel())})"
+    )
     _LOGGER.info(f"log_loc: {log_loc}")
     if len(sys.argv) == 1:
         _LOGGER.error(
@@ -507,7 +511,7 @@ async def main():
     )
 
     jpp_loop_count = 1
-    while jpp_loop_count <= MAX_LOOP_NUM:
+    while jpp_loop_count <= MAX_JPP_LOOP:
         if jpp_loop_count != 1:
             _LOGGER.error(f"Restarting JuicePass Proxy Loop ({jpp_loop_count})")
         jpp_loop_count += 1

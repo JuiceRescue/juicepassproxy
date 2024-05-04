@@ -4,8 +4,8 @@ import time
 
 from const import (
     ERROR_LOOKBACK_MIN,
-    MAX_CONNECT_ATTEMPT,
     MAX_ERROR_COUNT,
+    MAX_RETRY_ATTEMPT,
     UDPC_UPDATE_CHECK_TIMEOUT,
 )
 from juicebox_telnet import JuiceboxTelnet
@@ -49,11 +49,11 @@ class JuiceboxUDPCUpdater:
         connect_attempt = 1
         while (
             self._telnet is None
-            and connect_attempt <= MAX_CONNECT_ATTEMPT
+            and connect_attempt <= MAX_RETRY_ATTEMPT
             and self._error_count < MAX_ERROR_COUNT
         ):
             _LOGGER.debug(
-                f"Telnet connection attempt {connect_attempt} of {MAX_CONNECT_ATTEMPT}"
+                f"Telnet connection attempt {connect_attempt} of {MAX_RETRY_ATTEMPT}"
             )
             connect_attempt += 1
             self._telnet = JuiceboxTelnet(
