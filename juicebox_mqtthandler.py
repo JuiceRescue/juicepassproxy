@@ -321,7 +321,7 @@ class JuiceboxMQTTHandler:
                 mqtt_task_list.append(asyncio.create_task(entity.start()))
         await asyncio.gather(
             *mqtt_task_list,
-            return_exceptions=True,
+            # return_exceptions=True,
         )
         _LOGGER.debug("JuiceboxMQTTHandler start method completed")
 

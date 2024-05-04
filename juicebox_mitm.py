@@ -11,6 +11,10 @@ from const import ERROR_LOOKBACK_MIN, MAX_CONNECT_ATTEMPT, MAX_ERROR_COUNT
 # https://github.com/dannerph/keba-kecontact MIT
 
 _LOGGER = logging.getLogger(__name__)
+HANDLER_TIMEOUT = 10
+RECV_TIMEOUT = 120
+SEND_DATA_TIMEOUT = 10
+SEND_DATA_RETRIES = 3
 
 
 class JuiceboxMITM:
@@ -72,16 +76,16 @@ class JuiceboxMITM:
                     async with self._sending_lock:
                         self._dgram = await asyncio_dgram.bind(self._jpp_addr)
             except OSError as e:
-                await self._add_error()
                 _LOGGER.warning(
                     "JuiceboxMITM UDP Server Startup Error. Reconnecting. "
                     f"({e.__class__.__qualname__}: {e})"
                 )
+                await self._add_error()
                 self._dgram = None
                 pass
             await asyncio.sleep(5)
         if self._dgram is None:
-            raise ChildProcessError("JuiceboxMITM: Unable to start UDP Server.")
+            raise ChildProcessError("JuiceboxMITM: Unable to start MITM UDP Server.")
         if self._mitm_loop_task is None or self._mitm_loop_task.done():
             self._mitm_loop_task = await self._mitm_loop()
             self._loop.create_task(self._mitm_loop_task)
@@ -91,19 +95,37 @@ class JuiceboxMITM:
         _LOGGER.debug("Starting JuiceboxMITM Loop")
         while self._error_count < MAX_ERROR_COUNT:
             if self._dgram is None:
-                _LOGGER.warning("JuiceboxMITM Connection Lost. Reconnecting.")
+                _LOGGER.warning("JuiceboxMITM Reconnecting.")
+                await self._add_error()
                 await self._connect()
                 continue
             # _LOGGER.debug("Listening")
             try:
-                data, remote_addr = await self._dgram.recv()
+                async with asyncio.timeout(RECV_TIMEOUT):
+                    data, remote_addr = await self._dgram.recv()
             except asyncio_dgram.TransportClosed:
+                _LOGGER.warning("JuiceboxMITM Connection Lost.")
                 await self._add_error()
-                _LOGGER.warning("JuiceboxMITM Connection Lost. Reconnecting.")
                 self._dgram = None
-                await self._connect()
                 continue
-            self._loop.create_task(self._main_mitm_handler(data, remote_addr))
+            except TimeoutError as e:
+                _LOGGER.warning(
+                    f"No Message Received after {
+                        RECV_TIMEOUT} sec. ({e.__class__.__qualname__}: {e})"
+                )
+                await self._add_error()
+                self._dgram = None
+                continue
+            try:
+                async with asyncio.timeout(HANDLER_TIMEOUT):
+                    await self._main_mitm_handler(data, remote_addr)
+            except TimeoutError as e:
+                _LOGGER.warning(
+                    f"MITM Handler timeout after {
+                        HANDLER_TIMEOUT} sec. ({e.__class__.__qualname__}: {e})"
+                )
+                await self._add_error()
+                self._dgram = None
         raise ChildProcessError(
             f"JuiceboxMITM: More than {self._error_count} errors in the last {
                 ERROR_LOOKBACK_MIN} min."
@@ -123,7 +145,6 @@ class JuiceboxMITM:
                 try:
                     await self.send_data(data, self._enelx_addr)
                 except OSError as e:
-                    await self._add_error()
                     _LOGGER.warning(
                         f"JuiceboxMITM OSError {
                             errno.errorcode[e.errno]} [{self._enelx_addr}]: {e}"
@@ -132,13 +153,13 @@ class JuiceboxMITM:
                         f"JuiceboxMITM_OSERROR|server|{self._enelx_addr}|{
                             errno.errorcode[e.errno]}|{e}"
                     )
+                    await self._add_error()
         elif self._juicebox_addr is not None and from_addr == self._enelx_addr:
             if not self._ignore_remote:
                 data = await self._remote_mitm_handler(data)
                 try:
                     await self.send_data(data, self._juicebox_addr)
                 except OSError as e:
-                    await self._add_error()
                     _LOGGER.warning(
                         f"JuiceboxMITM OSError {
                             errno.errorcode[e.errno]} [{self._juicebox_addr}]: {e}"
@@ -147,6 +168,7 @@ class JuiceboxMITM:
                         f"JuiceboxMITM_OSERROR|client|{self._juicebox_addr}|{
                             errno.errorcode[e.errno]}|{e}"
                     )
+                    await self._add_error()
             else:
                 _LOGGER.info(f"JuiceboxMITM Ignoring Remote: {data}")
         else:
@@ -155,25 +177,39 @@ class JuiceboxMITM:
     async def send_data(
         self, data: bytes, to_addr: tuple[str, int], blocking_time: int = 0.1
     ):
-        if self._dgram is None:
-            _LOGGER.warning("JuiceboxMITM Connection Lost. Reconnecting.")
-            await self._connect()
-            _LOGGER.warning(f"JuiceboxMITM Resending: {data} to {to_addr}")
-            self._loop.create_task(self.send_data(data, to_addr, blocking_time))
-            return
-
-        async with self._sending_lock:
-            try:
-                await self._dgram.send(data, to_addr)
-            except asyncio_dgram.TransportClosed:
-                await self._add_error()
-                _LOGGER.warning("JuiceboxMITM Connection Lost. Reconnecting.")
-                self._dgram = None
-                await self._connect()
+        sent = False
+        send_attempt = 1
+        while not sent and send_attempt <= SEND_DATA_RETRIES:
+            if send_attempt != 1:
                 _LOGGER.warning(f"JuiceboxMITM Resending: {data} to {to_addr}")
-                self._loop.create_task(self.send_data(data, to_addr, blocking_time))
-                return
+            send_attempt += 1
+
+            if self._dgram is None:
+                _LOGGER.warning("JuiceboxMITM Reconnecting.")
+                await self._connect()
+
+            try:
+                async with asyncio.timeout(SEND_DATA_TIMEOUT):
+                    async with self._sending_lock:
+                        try:
+                            await self._dgram.send(data, to_addr)
+                        except asyncio_dgram.TransportClosed:
+                            _LOGGER.warning(
+                                "JuiceboxMITM Connection Lost while Sending."
+                            )
+                            await self._add_error()
+                            self._dgram = None
+                        else:
+                            sent = True
+            except TimeoutError as e:
+                _LOGGER.warning(
+                    f"Send Data timeout after {
+                        SEND_DATA_TIMEOUT} sec. ({e.__class__.__qualname__}: {e})"
+                )
+                await self._add_error()
             await asyncio.sleep(max(blocking_time, 0.1))
+        if not sent:
+            raise ChildProcessError("JuiceboxMITM: Unable to send data.")
 
         # _LOGGER.debug(f"JuiceboxMITM Sent: {data} to {to_addr}")
 

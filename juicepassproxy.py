@@ -145,12 +145,6 @@ async def get_enelx_server_port(juicebox_host, telnet_timeout=None):
                 e.__class__.__qualname__}: {e})"
         )
         return None
-    # except Exception as e:
-    #    _LOGGER.warning(
-    #        f"Error in getting EnelX Server and Port via Telnet: ({
-    #            e.__class__.__qualname__}) {e}"
-    #    )
-    #    return None
     return None
 
 
@@ -175,12 +169,6 @@ async def get_juicebox_id(juicebox_host, telnet_timeout=None):
                 e.__class__.__qualname__}: {e})"
         )
         return None
-    # except Exception as e:
-    #    _LOGGER.warning(
-    #        f"Error in getting JuiceBox ID via Telnet: ({
-    #            e.__class__.__qualname__}) {e}"
-    #    )
-    #    return None
     return None
 
 

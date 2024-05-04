@@ -6,6 +6,7 @@ from const import ERROR_LOOKBACK_MIN, MAX_CONNECT_ATTEMPT, MAX_ERROR_COUNT
 from juicebox_telnet import JuiceboxTelnet
 
 _LOGGER = logging.getLogger(__name__)
+UDPC_UPDATE_CHECK_TIMEOUT = 60
 
 
 class JuiceboxUDPCUpdater:
@@ -59,22 +60,20 @@ class JuiceboxUDPCUpdater:
             try:
                 await self._telnet.open()
             except TimeoutError as e:
-                await self._add_error()
                 _LOGGER.warning(
                     "JuiceboxUDPCUpdater Telnet Timeout. Reconnecting. "
-                    f"({e.__class__.__qualname__}: {e}) (Errors in last {
-                        ERROR_LOOKBACK_MIN} min: {self._error_count})"
+                    f"({e.__class__.__qualname__}: {e})"
                 )
+                await self._add_error()
                 await self._telnet.close()
                 self._telnet = None
                 pass
             except ConnectionResetError as e:
-                await self._add_error()
                 _LOGGER.warning(
                     "JuiceboxUDPCUpdater Telnet Connection Error. Reconnecting. "
-                    f"({e.__class__.__qualname__}: {e}) (Errors in last {
-                        ERROR_LOOKBACK_MIN} min: {self._error_count})"
+                    f"({e.__class__.__qualname__}: {e})"
                 )
+                await self._add_error()
                 await self._telnet.close()
                 self._telnet = None
                 pass
@@ -90,13 +89,23 @@ class JuiceboxUDPCUpdater:
         while self._error_count < MAX_ERROR_COUNT:
             sleep_interval = self._default_sleep_interval
             if self._telnet is None:
-                await self._add_error()
                 _LOGGER.warning(
-                    "JuiceboxUDPCUpdater Telnet Connection Lost. Reconnecting. (Errors in last {ERROR_LOOKBACK_MIN} min: {self._error_count})"
+                    "JuiceboxUDPCUpdater Telnet Connection Lost. Reconnecting."
                 )
                 await self._connect()
                 continue
-            sleep_interval = await self._udpc_update_handler(sleep_interval)
+            try:
+                async with asyncio.timeout(UDPC_UPDATE_CHECK_TIMEOUT):
+                    sleep_interval = await self._udpc_update_handler(sleep_interval)
+            except TimeoutError as e:
+                _LOGGER.warning(
+                    f"UDPC Update Check timeout after {
+                        UDPC_UPDATE_CHECK_TIMEOUT} sec. ({e.__class__.__qualname__}: {e})"
+                )
+                await self._add_error()
+                await self._telnet.close()
+                self._telnet = None
+                sleep_interval = 3
             await asyncio.sleep(sleep_interval)
         raise ChildProcessError(
             f"JuiceboxUDPCUpdater: More than {self._error_count} errors in the last {
@@ -147,40 +156,38 @@ class JuiceboxUDPCUpdater:
                 await self._telnet.save_udpc()
                 _LOGGER.info("UDPC IP Saved")
         except ConnectionResetError as e:
-            await self._add_error()
             _LOGGER.warning(
                 "Telnet connection to JuiceBox lost. "
                 "Nothing to worry about unless this happens a lot. "
                 f"({e.__class__.__qualname__}: {e}) (Errors in last {
                     ERROR_LOOKBACK_MIN} min: {self._error_count})"
             )
+            await self._add_error()
             await self._telnet.close()
             self._telnet = None
             sleep_interval = 3
         except TimeoutError as e:
-            await self._add_error()
             _LOGGER.warning(
                 "Telnet connection to JuiceBox has timed out. "
                 "Nothing to worry about unless this happens a lot. "
                 f"({e.__class__.__qualname__}: {e}) (Errors in last {
                     ERROR_LOOKBACK_MIN} min: {self._error_count})"
             )
+            await self._add_error()
             await self._telnet.close()
             self._telnet = None
             sleep_interval = 3
         except OSError as e:
-            await self._add_error()
             _LOGGER.warning(
                 "Could not route Telnet connection to JuiceBox. "
                 "Nothing to worry about unless this happens a lot. "
                 f"({e.__class__.__qualname__}: {e}) (Errors in last {
                     ERROR_LOOKBACK_MIN} min: {self._error_count})"
             )
+            await self._add_error()
             await self._telnet.close()
             self._telnet = None
             sleep_interval = 3
-        # except Exception as e:
-        #    _LOGGER.exception(f"Error in JuiceboxUDPCUpdater: ({e.__class__.__qualname__}: {e})")
         return sleep_interval
 
     async def _add_error(self):
