@@ -4,17 +4,21 @@ import logging
 import time
 
 import asyncio_dgram
-from const import ERROR_LOOKBACK_MIN, MAX_CONNECT_ATTEMPT, MAX_ERROR_COUNT
+from const import (
+    ERROR_LOOKBACK_MIN,
+    MAX_CONNECT_ATTEMPT,
+    MAX_ERROR_COUNT,
+    MITM_HANDLER_TIMEOUT,
+    MITM_RECV_TIMEOUT,
+    MITM_SEND_DATA_RETRIES,
+    MITM_SEND_DATA_TIMEOUT,
+)
 
 # https://github.com/rsc-dev/pyproxy MIT
 # https://github.com/lucas-six/python-cookbook Apache 2.0
 # https://github.com/dannerph/keba-kecontact MIT
 
 _LOGGER = logging.getLogger(__name__)
-HANDLER_TIMEOUT = 10
-RECV_TIMEOUT = 120
-SEND_DATA_TIMEOUT = 10
-SEND_DATA_RETRIES = 3
 
 
 class JuiceboxMITM:
@@ -65,9 +69,11 @@ class JuiceboxMITM:
             and connect_attempt <= MAX_CONNECT_ATTEMPT
             and self._error_count < MAX_ERROR_COUNT
         ):
-            _LOGGER.debug(
-                f"UDP Server Startup attempt {connect_attempt} of {MAX_CONNECT_ATTEMPT}"
-            )
+            if connect_attempt != 1:
+                _LOGGER.debug(
+                    f"Retrying UDP Server Startup. Attempt {
+                        connect_attempt} of {MAX_CONNECT_ATTEMPT}"
+                )
             connect_attempt += 1
             try:
                 if self._sending_lock.locked():
@@ -101,7 +107,7 @@ class JuiceboxMITM:
                 continue
             # _LOGGER.debug("Listening")
             try:
-                async with asyncio.timeout(RECV_TIMEOUT):
+                async with asyncio.timeout(MITM_RECV_TIMEOUT):
                     data, remote_addr = await self._dgram.recv()
             except asyncio_dgram.TransportClosed:
                 _LOGGER.warning("JuiceboxMITM Connection Lost.")
@@ -111,18 +117,18 @@ class JuiceboxMITM:
             except TimeoutError as e:
                 _LOGGER.warning(
                     f"No Message Received after {
-                        RECV_TIMEOUT} sec. ({e.__class__.__qualname__}: {e})"
+                        MITM_RECV_TIMEOUT} sec. ({e.__class__.__qualname__}: {e})"
                 )
                 await self._add_error()
                 self._dgram = None
                 continue
             try:
-                async with asyncio.timeout(HANDLER_TIMEOUT):
+                async with asyncio.timeout(MITM_HANDLER_TIMEOUT):
                     await self._main_mitm_handler(data, remote_addr)
             except TimeoutError as e:
                 _LOGGER.warning(
                     f"MITM Handler timeout after {
-                        HANDLER_TIMEOUT} sec. ({e.__class__.__qualname__}: {e})"
+                        MITM_HANDLER_TIMEOUT} sec. ({e.__class__.__qualname__}: {e})"
                 )
                 await self._add_error()
                 self._dgram = None
@@ -179,9 +185,12 @@ class JuiceboxMITM:
     ):
         sent = False
         send_attempt = 1
-        while not sent and send_attempt <= SEND_DATA_RETRIES:
+        while not sent and send_attempt <= MITM_SEND_DATA_RETRIES:
             if send_attempt != 1:
-                _LOGGER.warning(f"JuiceboxMITM Resending: {data} to {to_addr}")
+                _LOGGER.warning(
+                    f"JuiceboxMITM Resending (Attempt: {send_attempt} of {MITM_SEND_DATA_RETRIES}): {
+                        data} to {to_addr}"
+                )
             send_attempt += 1
 
             if self._dgram is None:
@@ -189,7 +198,7 @@ class JuiceboxMITM:
                 await self._connect()
 
             try:
-                async with asyncio.timeout(SEND_DATA_TIMEOUT):
+                async with asyncio.timeout(MITM_SEND_DATA_TIMEOUT):
                     async with self._sending_lock:
                         try:
                             await self._dgram.send(data, to_addr)
@@ -204,7 +213,7 @@ class JuiceboxMITM:
             except TimeoutError as e:
                 _LOGGER.warning(
                     f"Send Data timeout after {
-                        SEND_DATA_TIMEOUT} sec. ({e.__class__.__qualname__}: {e})"
+                        MITM_SEND_DATA_TIMEOUT} sec. ({e.__class__.__qualname__}: {e})"
                 )
                 await self._add_error()
             await asyncio.sleep(max(blocking_time, 0.1))

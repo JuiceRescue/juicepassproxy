@@ -2,11 +2,15 @@ import asyncio
 import logging
 import time
 
-from const import ERROR_LOOKBACK_MIN, MAX_CONNECT_ATTEMPT, MAX_ERROR_COUNT
+from const import (
+    ERROR_LOOKBACK_MIN,
+    MAX_CONNECT_ATTEMPT,
+    MAX_ERROR_COUNT,
+    UDPC_UPDATE_CHECK_TIMEOUT,
+)
 from juicebox_telnet import JuiceboxTelnet
 
 _LOGGER = logging.getLogger(__name__)
-UDPC_UPDATE_CHECK_TIMEOUT = 60
 
 
 class JuiceboxUDPCUpdater:
