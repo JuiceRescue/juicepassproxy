@@ -1,8 +1,9 @@
 import asyncio
 import logging
 import re
+import time
 
-from const import VERSION
+from const import ERROR_LOOKBACK_MIN, MAX_ERROR_COUNT, VERSION
 from ha_mqtt_discoverable import DeviceInfo, Settings
 from ha_mqtt_discoverable.sensors import Sensor, SensorInfo, Text, TextInfo
 from paho.mqtt.client import Client, MQTTMessage
@@ -33,12 +34,19 @@ class JuiceboxMQTTEntity:
         self.experimental = self._kwargs.get("experimental", False)
         self._unique_id = f"{self._kwargs.get("juicebox_id", None)} {self.name}"
         self._mitm_handler = self._kwargs.get("mitm_handler", None)
+        self._add_error = self._kwargs.get("add_error_func", None)
+
+    async def close(self):
+        if self._mqtt is not None:
+            self._mqtt.mqtt_client.disconnect()
 
     async def set_state(self, state=None):
         self.state = state
         try:
             self._mqtt.set_state(state)
         except AttributeError as e:
+            if self._add_error is not None:
+                await self._add_error()
             _LOGGER.warning(
                 f"Can't update state for {
                     self.name} as MQTT isn't connected/started. ({e.__class__.__qualname__}: {e})"
@@ -49,6 +57,8 @@ class JuiceboxMQTTEntity:
         try:
             self._mqtt.set_attributes(attr)
         except AttributeError as e:
+            if self._add_error is not None:
+                await self._add_error()
             _LOGGER.warning(
                 f"Can't update attribtutes for {
                     self.name} as MQTT isn't connected/started. ({e.__class__.__qualname__}: {e})"
@@ -142,6 +152,8 @@ class JuiceboxMQTTText(JuiceboxMQTTEntity):
             self._mqtt.set_text(text)
             _LOGGER.debug(f"Set Text ({self.name}): {text}")
         except AttributeError as e:
+            if self._add_error is not None:
+                await self._add_error()
             _LOGGER.warning(
                 f"Can't update text for {
                     self.name} as MQTT isn't connected/started. ({e.__class__.__qualname__}: {e})"
@@ -182,6 +194,8 @@ class JuiceboxMQTTHandler:
         self._juicebox_id = juicebox_id
         self._experimental = experimental
         self._mitm_handler = mitm_handler
+        self._error_count = 0
+        self._error_timestamp_list = []
 
         self._device_info = DeviceInfo(
             name=self._device_name,
@@ -287,6 +301,7 @@ class JuiceboxMQTTHandler:
                 juicebox_id=self._juicebox_id,
                 device_info=self._device_info,
                 mqtt_settings=self._mqtt_settings,
+                add_error_func=self._add_error,
             )
             if entity.ent_type in ["text"]:
                 if self._mitm_handler is not None:
@@ -299,14 +314,20 @@ class JuiceboxMQTTHandler:
     async def start(self):
         _LOGGER.info("Starting JuiceboxMQTTHandler")
 
-        gather_list = []
+        # while self._error_count < MAX_ERROR_COUNT:
+        mqtt_task_list = []
         for entity in self._entities.values():
             if entity.experimental is False or self._experimental is True:
-                gather_list.append(asyncio.create_task(entity.start()))
+                mqtt_task_list.append(asyncio.create_task(entity.start()))
         await asyncio.gather(
-            *gather_list,
+            *mqtt_task_list,
             return_exceptions=True,
         )
+        _LOGGER.debug("JuiceboxMQTTHandler start method completed")
+
+    async def close(self):
+        for entity in self._entities.values():
+            await entity.close()
 
     async def set_mitm_handler(self, mitm_handler):
         self._mitm_handler = mitm_handler
@@ -430,25 +451,20 @@ class JuiceboxMQTTHandler:
     async def _basic_message_publish(self, message):
         _LOGGER.debug(f"Publish {message.get('type').title()} Message: {message}")
 
-        try:
-            attributes = {}
-            for k in message:
-                entity = self._entities.get(k, None)
-                if entity and (
-                    entity.experimental is False or self._experimental is True
-                ):
-                    await entity.set_state(message.get(k, None))
-                attributes[k] = message.get(k, None)
-            if (
-                self._experimental
-                and self._entities.get("local_data", None) is not None
-            ):
-                await self._entities.get("local_data").set_attributes(attributes)
-        except Exception as e:
-            _LOGGER.exception(
-                f"Failed to publish sensor data to MQTT. ({e.__class__.__qualname__}: {
-                    e})"
-            )
+        # try:
+        attributes = {}
+        for k in message:
+            entity = self._entities.get(k, None)
+            if entity and (entity.experimental is False or self._experimental is True):
+                await entity.set_state(message.get(k, None))
+            attributes[k] = message.get(k, None)
+        if self._experimental and self._entities.get("local_data", None) is not None:
+            await self._entities.get("local_data").set_attributes(attributes)
+        # except Exception as e:
+        #    _LOGGER.exception(
+        #        f"Failed to publish sensor data to MQTT. ({e.__class__.__qualname__}: {
+        #            e})"
+        #    )
 
     async def remote_mitm_handler(self, data):
         try:
@@ -461,15 +477,16 @@ class JuiceboxMQTTHandler:
 
             return data
         except IndexError as e:
+            await self._add_error()
             _LOGGER.warning(
                 "Index error when handling remote data, probably wrong number of items in list. "
                 "Nothing to worry about unless this happens a lot. "
                 f"({e.__class__.__qualname__}: {e})"
             )
-        except Exception as e:
-            _LOGGER.exception(
-                f"Exception handling remote data. ({e.__class__.__qualname__}: {e})"
-            )
+        # except Exception as e:
+        #    _LOGGER.exception(
+        #        f"Exception handling remote data. ({e.__class__.__qualname__}: {e})"
+        #    )
 
     async def local_mitm_handler(self, data):
         message = None
@@ -485,12 +502,23 @@ class JuiceboxMQTTHandler:
                 await self._basic_message_publish(message)
             return data
         except IndexError as e:
+            await self._add_error()
             _LOGGER.warning(
                 "Index error when handling local data, probably wrong number of items in list"
                 "Nothing to worry about unless this happens a lot. "
                 f"({e.__class__.__qualname__}: {e})"
             )
-        except Exception as e:
-            _LOGGER.exception(
-                f"Exception handling local data. ({e.__class__.__qualname__}: {e})"
-            )
+        # except Exception as e:
+        #    _LOGGER.exception(
+        #        f"Exception handling local data. ({e.__class__.__qualname__}: {e})"
+        #    )
+
+    async def _add_error(self):
+        self._error_timestamp_list.append(time.time())
+        time_cutoff = time.time() - (ERROR_LOOKBACK_MIN * 60)
+        temp_list = list(
+            filter(lambda el: el > time_cutoff, self._error_timestamp_list)
+        )
+        self._error_timestamp_list = temp_list
+        self._error_count = len(self._error_timestamp_list)
+        _LOGGER.debug(f"Errors in last {ERROR_LOOKBACK_MIN} min: {self._error_count}")

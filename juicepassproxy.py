@@ -44,6 +44,8 @@ logging.basicConfig(
 )
 _LOGGER = logging.getLogger(__name__)
 
+MAX_LOOP_NUM = 10
+
 AP_DESCRIPTION = """
 JuicePass Proxy - by snicker
 Publish JuiceBox data from a UDP Man in the Middle Proxy to MQTT discoverable by HomeAssistant.
@@ -133,14 +135,14 @@ async def get_enelx_server_port(juicebox_host, telnet_timeout=None):
                     return connection["dest"]
     except TimeoutError as e:
         _LOGGER.warning(
-            f"Error in getting EnelX Server and Port via Telnet: ({
-                e.__class__.__qualname__}) {e}"
+            f"Error in getting EnelX Server and Port via Telnet. ({
+                e.__class__.__qualname__}: {e})"
         )
         return None
     except ConnectionResetError as e:
         _LOGGER.warning(
-            f"Error in getting EnelX Server and Port via Telnet: ({
-                e.__class__.__qualname__}) {e}"
+            f"Error in getting EnelX Server and Port via Telnet. ({
+                e.__class__.__qualname__}: {e})"
         )
         return None
     # except Exception as e:
@@ -163,14 +165,14 @@ async def get_juicebox_id(juicebox_host, telnet_timeout=None):
             return juicebox_id
     except TimeoutError as e:
         _LOGGER.warning(
-            f"Error in getting JuiceBox ID via Telnet: ({
-                e.__class__.__qualname__}) {e}"
+            f"Error in getting JuiceBox ID via Telnet. ({
+                e.__class__.__qualname__}: {e})"
         )
         return None
     except ConnectionResetError as e:
         _LOGGER.warning(
-            f"Error in getting JuiceBox ID via Telnet: ({
-                e.__class__.__qualname__}) {e}"
+            f"Error in getting JuiceBox ID via Telnet. ({
+                e.__class__.__qualname__}: {e})"
         )
         return None
     # except Exception as e:
@@ -484,8 +486,6 @@ async def main():
 
     await write_config(config, config_loc)
 
-    gather_list = []
-
     mqtt_settings = Settings.MQTT(
         host=args.mqtt_host,
         port=args.mqtt_port,
@@ -494,45 +494,77 @@ async def main():
         discovery_prefix=args.mqtt_discovery_prefix,
     )
 
-    mqtt_handler = JuiceboxMQTTHandler(
-        mqtt_settings=mqtt_settings,
-        device_name=args.device_name,
-        juicebox_id=juicebox_id,
-        experimental=experimental,
-        loglevel=_LOGGER.getEffectiveLevel(),
-    )
-    gather_list.append(asyncio.create_task(mqtt_handler.start()))
-
-    mitm_handler = JuiceboxMITM(
-        jpp_addr=local_addr,  # Local/Docker IP
-        enelx_addr=enelx_addr,  # EnelX IP
-        ignore_remote=ignore_remote,
-        loglevel=_LOGGER.getEffectiveLevel(),
-    )
-    await mitm_handler.set_local_mitm_handler(mqtt_handler.local_mitm_handler)
-    await mitm_handler.set_remote_mitm_handler(mqtt_handler.remote_mitm_handler)
-    gather_list.append(asyncio.create_task(mitm_handler.start()))
-
-    await mqtt_handler.set_mitm_handler(mitm_handler)
-    await mitm_handler.set_mqtt_handler(mqtt_handler)
-
-    if args.update_udpc:
-        jpp_host = args.jpp_host or local_addr[0]
-        udpc_updater = JuiceboxUDPCUpdater(
-            juicebox_host=args.juicebox_host,
-            jpp_host=jpp_host,
-            udpc_port=local_addr[1],
-            telnet_timeout=telnet_timeout,
+    jpp_loop_count = 1
+    while jpp_loop_count <= MAX_LOOP_NUM:
+        if jpp_loop_count != 1:
+            _LOGGER.error(f"Restarting JuicePass Proxy Loop ({jpp_loop_count})")
+        jpp_loop_count += 1
+        jpp_task_list = []
+        udpc_updater = None
+        mqtt_handler = JuiceboxMQTTHandler(
+            mqtt_settings=mqtt_settings,
+            device_name=args.device_name,
+            juicebox_id=juicebox_id,
+            experimental=experimental,
             loglevel=_LOGGER.getEffectiveLevel(),
         )
-        gather_list.append(asyncio.create_task(udpc_updater.start()))
+        jpp_task_list.append(
+            asyncio.create_task(mqtt_handler.start(), name="mqtt_handler")
+        )
 
-    await asyncio.gather(
-        *gather_list,
-        return_exceptions=True,
-    )
+        mitm_handler = JuiceboxMITM(
+            jpp_addr=local_addr,  # Local/Docker IP
+            enelx_addr=enelx_addr,  # EnelX IP
+            ignore_remote=ignore_remote,
+            loglevel=_LOGGER.getEffectiveLevel(),
+        )
+        await mitm_handler.set_local_mitm_handler(mqtt_handler.local_mitm_handler)
+        await mitm_handler.set_remote_mitm_handler(mqtt_handler.remote_mitm_handler)
+        jpp_task_list.append(
+            asyncio.create_task(mitm_handler.start(), name="mitm_handler")
+        )
 
-    _LOGGER.debug("juicepassproxy: end of main")
+        await mqtt_handler.set_mitm_handler(mitm_handler)
+        await mitm_handler.set_mqtt_handler(mqtt_handler)
+
+        if args.update_udpc:
+            jpp_host = args.jpp_host or local_addr[0]
+            udpc_updater = JuiceboxUDPCUpdater(
+                juicebox_host=args.juicebox_host,
+                jpp_host=jpp_host,
+                udpc_port=local_addr[1],
+                telnet_timeout=telnet_timeout,
+                loglevel=_LOGGER.getEffectiveLevel(),
+            )
+            jpp_task_list.append(
+                asyncio.create_task(udpc_updater.start(), name="udpc_updater")
+            )
+
+        try:
+            await asyncio.gather(
+                *jpp_task_list,
+                # return_exceptions=True,
+            )
+        except Exception as e:
+            _LOGGER.error(
+                f"A JuicePass Proxy task failed: {
+                    e.__class__.__qualname__}: {e}"
+            )
+            await mqtt_handler.close()
+            await mitm_handler.close()
+            del mqtt_handler
+            del mitm_handler
+            if udpc_updater is not None:
+                await udpc_updater.close()
+                del udpc_updater
+            await asyncio.sleep(5)
+            _LOGGER.debug(f"jpp_task_list: {jpp_task_list}")
+            for task in jpp_task_list:
+                task.cancel()
+        await asyncio.sleep(5)
+
+    _LOGGER.error("JuicePass Proxy Exiting")
+    sys.exit(1)
 
 
 if __name__ == "__main__":

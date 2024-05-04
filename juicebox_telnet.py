@@ -34,14 +34,14 @@ class JuiceboxTelnet:
         try:
             async with asyncio.timeout(self.timeout):
                 data = await self.reader.readuntil(match)
-        except asyncio.TimeoutError:
-            _LOGGER.warning(f"TimeoutError: readuntil (match: {match}, data: {data})")
-            raise
-        except ConnectionResetError:
-            _LOGGER.warning(
-                f"ConnectionResetError: readuntil (match: {match}, data: {data})"
-            )
-            raise
+        except asyncio.TimeoutError as e:
+            # _LOGGER.warning(f"TimeoutError: readuntil (match: {match}, data: {data})")
+            raise TimeoutError(f"readuntil (match: {match}, data: {data})") from e
+        except ConnectionResetError as e:
+            # _LOGGER.warning(f"ConnectionResetError: readuntil (match: {match}, data: {data})")
+            raise ConnectionResetError(
+                f"readuntil (match: {match}, data: {data})"
+            ) from e
         # _LOGGER.debug(f"readuntil data: {data}")
         return data
 
@@ -50,12 +50,12 @@ class JuiceboxTelnet:
             async with asyncio.timeout(self.timeout):
                 self.writer.write(data)
                 await self.writer.drain()
-        except TimeoutError:
-            _LOGGER.warning(f"TimeoutError: write (data: {data})")
-            raise
-        except ConnectionResetError:
-            _LOGGER.warning(f"ConnectionResetError: write (data: {data})")
-            raise
+        except TimeoutError as e:
+            # _LOGGER.warning(f"TimeoutError: write (data: {data})")
+            raise TimeoutError(f"write (data: {data})") from e
+        except ConnectionResetError as e:
+            # _LOGGER.warning(f"ConnectionResetError: write (data: {data})")
+            raise ConnectionResetError(f"write (data: {data})") from e
         return True
 
     async def open(self):
@@ -66,14 +66,22 @@ class JuiceboxTelnet:
                         self.host, self.port, encoding=False
                     )
                 await self.readuntil(b">")
-            except TimeoutError:
-                _LOGGER.warning("TimeoutError: Open Telnet Connection Failed")
-                raise
-            except ConnectionResetError:
-                _LOGGER.warning("ConnectionResetError: Open Telnet Connection Failed")
-                raise
+            except TimeoutError as e:
+                # _LOGGER.warning("TimeoutError: Open Telnet Connection Failed")
+                raise TimeoutError("Telnet Connection Failed") from e
+            except ConnectionResetError as e:
+                # _LOGGER.warning("ConnectionResetError: Open Telnet Connection Failed")
+                raise ConnectionResetError("Telnet Connection Failed") from e
         # _LOGGER.debug("Telnet Opened")
         return True
+
+    async def close(self):
+        if self.reader:
+            self.reader.close()
+        self.reader = None
+        if self.writer:
+            self.writer.close()
+        self.writer = None
 
     async def get_udpc_list(self):
         out = []
