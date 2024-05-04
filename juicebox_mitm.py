@@ -3,7 +3,9 @@ import errno
 import logging
 import time
 
-import asyncio_dgram
+# Temporary until asyncio_dgram release is updated to include reuse_port attribute in bind
+# import asyncio_dgram
+import asyncio_dgram_local as asyncio_dgram
 from const import (
     ERROR_LOOKBACK_MIN,
     MAX_CONNECT_ATTEMPT,
@@ -77,10 +79,14 @@ class JuiceboxMITM:
             connect_attempt += 1
             try:
                 if self._sending_lock.locked():
-                    self._dgram = await asyncio_dgram.bind(self._jpp_addr)
+                    self._dgram = await asyncio_dgram.bind(
+                        self._jpp_addr, reuse_port=True
+                    )
                 else:
                     async with self._sending_lock:
-                        self._dgram = await asyncio_dgram.bind(self._jpp_addr)
+                        self._dgram = await asyncio_dgram.bind(
+                            self._jpp_addr, reuse_port=True
+                        )
             except OSError as e:
                 _LOGGER.warning(
                     "JuiceboxMITM UDP Server Startup Error. Reconnecting. "
