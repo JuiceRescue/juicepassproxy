@@ -468,7 +468,7 @@ class JuiceboxMQTTHandler:
 
     async def remote_mitm_handler(self, data):
         try:
-            _LOGGER.debug(f"Remote: {data}")
+            _LOGGER.debug(f"From EnelX: {data}")
             if (
                 self._experimental
                 and self._entities.get("remote_data", None) is not None
@@ -491,7 +491,7 @@ class JuiceboxMQTTHandler:
     async def local_mitm_handler(self, data):
         message = None
         try:
-            _LOGGER.debug(f"Local: {data}")
+            _LOGGER.debug(f"From JuiceBox: {data}")
             if "JuiceboxMITM_OSERROR" in str(data):
                 message = await self._udp_mitm_oserror_message_parse(data)
             elif ":DBG," in str(data):

@@ -33,6 +33,10 @@ elif [[ ! -z "${SRC}" ]]; then
   logger INFO "LOCAL_IP: ${SRC}"
   JPP_STRING+=" --local_ip ${SRC}"
 fi
+if [[ ! -z "${LOCAL_PORT}" ]]; then
+  logger INFO "LOCAL_PORT: ${LOCAL_PORT}"
+  JPP_STRING+=" --local_port ${LOCAL_PORT}"
+fi
 if [[ ! -z "${ENELX_IP}" ]]; then
   logger INFO "ENELX_IP: ${ENELX_IP}"
   JPP_STRING+=" --enelx_ip ${ENELX_IP}"

@@ -320,6 +320,14 @@ async def parse_args():
         help="Local IP (and optional port). If not defined, will obtain it automatically. (Ex. 127.0.0.1:8047) [Deprecated: -s --src]",
     )
     parser.add_argument(
+        "--local_port",
+        dest="local_port",
+        required=False,
+        type=int,
+        metavar="PORT",
+        help="Local Port for JPP to listen on.",
+    )
+    parser.add_argument(
         "--enelx_ip",
         "-d",
         "--dst",
@@ -398,17 +406,33 @@ async def main():
     _LOGGER.info(f"enelx_server: {enelx_server}")
     _LOGGER.info(f"enelx_port: {enelx_port}")
 
+    if (
+        args.local_port
+        and args.local_ip
+        and ":" in args.local_ip
+        and int(args.local_ip.split(":")[1]) != args.local_port
+    ):
+        _LOGGER.error(
+            f"Exiting: Local port conflict: --local_ip with port {
+                args.local_ip.split(":")[1]} and --local_port of {args.local_port}",
+        )
+        sys.exit(1)
+
+    if args.local_port:
+        local_port = args.local_port
+    else:
+        local_port = enelx_port
     if args.local_ip:
         if ":" in args.local_ip:
             local_addr = ip_to_tuple(args.local_ip)
         else:
-            local_addr = ip_to_tuple(f"{args.local_ip}:{enelx_port}")
+            local_addr = ip_to_tuple(f"{args.local_ip}:{local_port}")
     elif local_ip := await get_local_ip():
-        local_addr = ip_to_tuple(f"{local_ip}:{enelx_port}")
+        local_addr = ip_to_tuple(f"{local_ip}:{local_port}")
     else:
         local_addr = ip_to_tuple(
             f"{config.get('LOCAL_IP', config.get('SRC', DEFAULT_LOCAL_IP))}:{
-                enelx_port}"
+                local_port}"
         )
     config.update({"LOCAL_IP": local_addr[0]})
     _LOGGER.info(f"local_addr: {local_addr[0]}:{local_addr[1]}")

@@ -170,7 +170,7 @@ class JuiceboxMITM:
                     )
                     await self._add_error()
             else:
-                _LOGGER.info(f"JuiceboxMITM Ignoring Remote: {data}")
+                _LOGGER.info(f"JuiceboxMITM Ignoring From EnelX: {data}")
         else:
             _LOGGER.warning(f"JuiceboxMITM Unknown address: {from_addr}")
 

@@ -83,7 +83,7 @@ services:
 
 Variable | Required | Description & Default |
 -- | -- | --
-**JUICEBOX_HOST** | **Recommended**</br></br>**Required if Update UDPC is True.** | If defined, it will attempt to get the EnelX Server and Port using Telnet. If unsuccessful, it will default to the EnelX Server and Port below.
+**JUICEBOX_HOST** | **Recommended**</br></br>**Required if Update UDPC is True.** | If defined, will attempt to get the EnelX Server Name, IP, and Port using telnet.
 **UPDATE_UDPC** | No | Default: false. If true, will continually update the JuiceBox via telnet to point to JuicePass Proxy.
 **JPP_HOST**  | **Required if Update UDPC is True** |  This is the IP or Hostname of the machine where JuicePass Proxy is running (**not** the IP of the Docker Container)
 **MQTT_HOST** | No | 127.0.0.1
@@ -103,8 +103,9 @@ Variable | Required | Description & Default |
 **IGNORE_REMOTE**  | No  | Default: false. If true, will not send commands received from EnelX to the JuiceBox nor send outgoing information from the JuiceBox to EnelX
 **TELNET_TIMEOUT**  | No  | Default: 30. Timeout in seconds for telnet operations.
 **JUICEBOX_ID**  | No | If not defined, it will attempt to get the JuiceBox ID using Telnet.
-**LOCAL_IP**<br><br>_Deprecated Variable: SRC_ | No | If not defined, it will attempt to get the Local Docker IP. If unsuccessful, it will default to 127.0.0.1.
-**ENELX_IP**<br><br>_Deprecated Variable: DST_ | No | If not defined, it will attempt to get the IP of the EnelX Server. If unsuccessful, it will default to 54.161.185.130. If manually defined, only use the IP address of the EnelX Server and not the fully qualified domain name to avoid DNS lookup loops.
+**LOCAL_IP**<br><br>_Deprecated Variable: SRC_ | No | If not defined, it will attempt to get the Local Docker IP. Can optionally define port (ex. 127.0.0.1:8047). If unsuccessful, it will default to 127.0.0.1.
+**LOCAL_PORT** | No | Local port for JuicePass Proxy to listen on. If not defined, will use the EnelX Port.
+**ENELX_IP**<br><br>_Deprecated Variable: DST_ | No | If not defined, it will attempt to get the IP of the EnelX Server. If unsuccessful, it will default to 54.161.185.130. Can optionally define port (ex. 54.161.185.130:8047). If defined, only use the IP address of the EnelX Server and not the fully qualified domain name to avoid DNS lookup loops.
 </details>
 
 <details>
