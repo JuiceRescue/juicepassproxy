@@ -3,12 +3,13 @@ import logging
 import re
 import time
 
+import ha_mqtt_discoverable.sensors as ha_mqtt
 from const import ERROR_LOOKBACK_MIN, MAX_ERROR_COUNT, VERSION
 from ha_mqtt_discoverable import DeviceInfo, Settings
-from ha_mqtt_discoverable.sensors import Sensor, SensorInfo, Text, TextInfo
 from paho.mqtt.client import Client, MQTTMessage
 
 _LOGGER = logging.getLogger(__name__)
+MQTT_SENDING_ENTITIES = ["text", "number", "switch", "button"]
 
 
 class JuiceboxMQTTEntity:
@@ -21,29 +22,71 @@ class JuiceboxMQTTEntity:
         self.name = name
         self._kwargs = kwargs
         self._process_kwargs()
-        self.state = None
+        self._state = None
         self.attributes = {}
         self._mqtt = None
         self._loop = asyncio.get_running_loop()
+        # self.entity_type
+        # self._set_func
 
     def add_kwargs(self, **kwargs):
         self._kwargs.update(kwargs)
         self._process_kwargs()
 
     def _process_kwargs(self):
+        self._kwargs.update(
+            {
+                "name": self.name,
+                "unique_id": f"{self._kwargs.get("juicebox_id", None)} {self.name}",
+            }
+        )
         self.experimental = self._kwargs.get("experimental", False)
         self._unique_id = f"{self._kwargs.get("juicebox_id", None)} {self.name}"
         self._mitm_handler = self._kwargs.get("mitm_handler", None)
         self._add_error = self._kwargs.get("add_error_func", None)
 
+    @property
+    def state(self):
+        return self._state
+
+    async def start(self):
+        entity_info_keys = getattr(
+            ha_mqtt, f"{self.entity_type.title()}Info"
+        ).__fields__.keys()
+        # _LOGGER.debug(f"Entity Info Keys: {entity_info_keys}")
+        entity_info = {}
+        for key in entity_info_keys:
+            if self._kwargs.get(key, None) is not None:
+                entity_info.update({key: self._kwargs.get(key, None)})
+        # _LOGGER.debug(f"entity_info: {entity_info}")
+        # entity_info_class = (
+        #    getattr(ha_mqtt, f"{self.entity_type.title()}Info").parse_obj(entity_info),
+        # )
+        # _LOGGER.debug(f"entity_info_class: {entity_info_class}")
+        self._mqtt = getattr(ha_mqtt, f"{self.entity_type.title()}")(
+            Settings(
+                mqtt=self._kwargs.get("mqtt", self._kwargs.get("mqtt_settings", None)),
+                entity=getattr(ha_mqtt, f"{self.entity_type.title()}Info").parse_obj(
+                    entity_info
+                ),
+            )
+        )
+
+        if self._kwargs.get("initial_state", None) is not None:
+            await self.set(self._kwargs.get("initial_state", None))
+
     async def close(self):
         if self._mqtt is not None:
             self._mqtt.mqtt_client.disconnect()
 
-    async def set_state(self, state=None):
-        self.state = state
+    async def set_state(self, state):
+        await self.set(state)
+
+    async def set(self, state=None):
+        self._state = state
         try:
-            self._mqtt.set_state(state)
+            # self._mqtt.set_state(state)
+            getattr(self._mqtt, self._set_func)(state)
         except AttributeError as e:
             if self._add_error is not None:
                 await self._add_error()
@@ -65,6 +108,64 @@ class JuiceboxMQTTEntity:
             )
 
 
+class JuiceboxMQTTSendingEntity(JuiceboxMQTTEntity):
+    def __init__(
+        self,
+        name,
+        **kwargs,
+    ):
+        # _LOGGER.debug(f"SendingEntity Init: {name}")
+        super().__init__(name, **kwargs)
+
+    async def start(self):
+        entity_info_keys = getattr(
+            ha_mqtt, f"{self.entity_type.title()}Info"
+        ).__fields__.keys()
+        # _LOGGER.debug(f"Entity Info Keys: {entity_info_keys}")
+        entity_info = {}
+        for key in entity_info_keys:
+            if self._kwargs.get(key, None) is not None:
+                entity_info.update({key: self._kwargs.get(key, None)})
+        # _LOGGER.debug(f"entity_info: {entity_info}")
+        # entity_info_class = (
+        #    getattr(ha_mqtt, f"{self.entity_type.title()}Info").parse_obj(entity_info),
+        # )
+        # _LOGGER.debug(f"entity_info_class: {entity_info_class}")
+        self._mqtt = getattr(ha_mqtt, f"{self.entity_type.title()}")(
+            Settings(
+                mqtt=self._kwargs.get("mqtt", self._kwargs.get("mqtt_settings", None)),
+                entity=getattr(ha_mqtt, f"{self.entity_type.title()}Info").parse_obj(
+                    entity_info
+                ),
+            ),
+            command_callback=self._callback,
+            user_data=self._kwargs.get("user_data", None),
+        )
+
+        if self._kwargs.get("initial_state", None) is not None:
+            await self.set(self._kwargs.get("initial_state", None))
+        else:
+            await self.set(self.name)
+
+    def _callback(self, client: Client, user_data, message: MQTTMessage):
+        self._loop.create_task(self._callback_async(client, user_data, message))
+
+    async def _callback_async(self, client: Client, user_data, message: MQTTMessage):
+        state = message.payload.decode()
+        _LOGGER.info(
+            f"{self.entity_type.title()} Callback ({self.name}): {
+                state}. User Data: {user_data}"
+        )
+        if self._mitm_handler:
+            _LOGGER.debug(f"Sending to MITM: {state}")
+            await self._mitm_handler.send_data_to_juicebox(state.encode("utf-8"))
+        else:
+            _LOGGER.debug(
+                f"Cannot send to MITM. mitm_handler type: {type(self._mitm_handler)}"
+            )
+        await self.set(state)
+
+
 class JuiceboxMQTTSensor(JuiceboxMQTTEntity):
     def __init__(
         self,
@@ -72,109 +173,24 @@ class JuiceboxMQTTSensor(JuiceboxMQTTEntity):
         **kwargs,
     ):
         # _LOGGER.debug(f"Sensor Init: {name}")
-        self.ent_type = "sensor"
+        self.entity_type = "sensor"
+        self._set_func = "set_state"
         super().__init__(name, **kwargs)
 
-    async def start(self):
-        self._mqtt = Sensor(
-            Settings(
-                mqtt=self._kwargs.get("mqtt", self._kwargs.get("mqtt_settings", None)),
-                entity=SensorInfo(
-                    name=self.name,
-                    unique_id=self._unique_id,
-                    icon=self._kwargs.get("icon", None),
-                    state_class=self._kwargs.get("state_class", None),
-                    device_class=self._kwargs.get("device_class", None),
-                    unit_of_measurement=self._kwargs.get("unit_of_measurement", None),
-                    entity_category=self._kwargs.get("entity_category", None),
-                    expire_after=self._kwargs.get("expire_after", None),
-                    enabled_by_default=self._kwargs.get("enabled_by_default", True),
-                    device=self._kwargs.get(
-                        "device", self._kwargs.get("device_info", None)
-                    ),
-                ),
-            )
-        )
 
-        if self._kwargs.get("initial_state", None) is not None:
-            await self.set_state(self._kwargs.get("initial_state", None))
-        # _LOGGER.debug(f"Started Sensor: {self.name}. MQTT: {self._mqtt}")
-
-
-class JuiceboxMQTTText(JuiceboxMQTTEntity):
+class JuiceboxMQTTText(JuiceboxMQTTSendingEntity):
     def __init__(
         self,
         name,
         **kwargs,
     ):
         # _LOGGER.debug(f"Text Init: {name}")
-        self.ent_type = "text"
+        self.entity_type = "text"
+        self._set_func = "set_text"
         super().__init__(name, **kwargs)
 
-    async def start(self):
-        self.callback = self._kwargs.get("callback", self._default_callback)
-
-        self._mqtt = Text(
-            Settings(
-                mqtt=self._kwargs.get("mqtt", self._kwargs.get("mqtt_settings", None)),
-                entity=TextInfo(
-                    name=self.name,
-                    unique_id=self._unique_id,
-                    device=self._kwargs.get(
-                        "device", self._kwargs.get("device_info", None)
-                    ),
-                    icon=self._kwargs.get("icon", None),
-                    device_class=self._kwargs.get("device_class", None),
-                    unit_of_measurement=self._kwargs.get("unit_of_measurement", None),
-                    entity_category=self._kwargs.get("entity_category", None),
-                    expire_after=self._kwargs.get("expire_after", None),
-                    enabled_by_default=self._kwargs.get("enabled_by_default", True),
-                ),
-            ),
-            command_callback=self.callback,
-            user_data=self._kwargs.get("user_data", None),
-        )
-
-        if self._kwargs.get("initial_text", None) is not None:
-            # _LOGGER.debug("sending initial_text")
-            await self.set_text(self._kwargs.get("initial_text", None))
-        else:
-            await self.set_text(self.name)
-        # _LOGGER.debug(f"Started Text: {self.name}. MQTT: {self._mqtt}")
-        _LOGGER.debug(f"Started Text: {self.name}")
-
-    async def set_state(self, state=None):
-        await self.set_text(state)
-
-    async def set_text(self, text=None):
-        self.state = text
-        try:
-            self._mqtt.set_text(text)
-            _LOGGER.debug(f"Set Text ({self.name}): {text}")
-        except AttributeError as e:
-            if self._add_error is not None:
-                await self._add_error()
-            _LOGGER.warning(
-                f"Can't update text for {
-                    self.name} as MQTT isn't connected/started. ({e.__class__.__qualname__}: {e})"
-            )
-
-    def _default_callback(self, client: Client, user_data, message: MQTTMessage):
-        self._loop.create_task(self._default_callback_async(client, user_data, message))
-
-    async def _default_callback_async(
-        self, client: Client, user_data, message: MQTTMessage
-    ):
-        text = message.payload.decode()
-        _LOGGER.info(f"Text Callback ({self.name}): {text}. User Data: {user_data}")
-        if self._mitm_handler:
-            _LOGGER.debug(f"Sending to MITM: {text}")
-            await self._mitm_handler.send_data_to_juicebox(text.encode("utf-8"))
-        else:
-            _LOGGER.debug(
-                f"Cannot send to MITM. mitm_handler type: {type(self._mitm_handler)}"
-            )
-        await self.set_text(text)
+    async def set_text(self, state):
+        await self.set(state)
 
 
 class JuiceboxMQTTHandler:
@@ -197,7 +213,7 @@ class JuiceboxMQTTHandler:
         self._error_count = 0
         self._error_timestamp_list = []
 
-        self._device_info = DeviceInfo(
+        self._device = DeviceInfo(
             name=self._device_name,
             identifiers=(
                 [self._juicebox_id]
@@ -299,16 +315,11 @@ class JuiceboxMQTTHandler:
         for entity in self._entities.values():
             entity.add_kwargs(
                 juicebox_id=self._juicebox_id,
-                device_info=self._device_info,
+                device=self._device,
                 mqtt_settings=self._mqtt_settings,
                 add_error_func=self._add_error,
             )
-            if entity.ent_type in ["text"]:
-                if self._mitm_handler is not None:
-                    _LOGGER.debug(
-                        f"Adding mitm_handler ({type(self._mitm_handler)}) to: {
-                            entity.name} (type: {entity.ent_type})"
-                    )
+            if entity.entity_type in MQTT_SENDING_ENTITIES:
                 entity.add_kwargs(mitm_handler=self._mitm_handler)
 
     async def start(self):
@@ -332,21 +343,11 @@ class JuiceboxMQTTHandler:
     async def set_mitm_handler(self, mitm_handler):
         self._mitm_handler = mitm_handler
         for entity in self._entities.values():
-            if entity.ent_type in ["text"]:
-                if self._mitm_handler is not None:
-                    _LOGGER.debug(
-                        f"Adding mitm_handler ({type(self._mitm_handler)}) to: {
-                            entity.name} (type: {entity.ent_type})"
-                    )
+            if entity.entity_type in MQTT_SENDING_ENTITIES:
                 entity.add_kwargs(mitm_handler=mitm_handler)
 
     async def _basic_message_parse(self, data: bytes):
         message = {"type": "basic"}
-        message["current"] = 0
-        message["energy_session"] = 0
-        message["current_max"] = 0
-        message["current_max_charging"] = 0
-        message["current_rating"] = 0
         active = True
         parts = re.split(r",|!|:", data.decode("utf-8"))
         parts.pop(0)  # JuiceBox ID
@@ -379,22 +380,22 @@ class JuiceboxMQTTHandler:
                 if message["status"] is None:
                     message["status"] = f"unknown {part}"
                 active = message["status"].lower() == "charging"
-            elif part[0] == "A" and active:
-                message["current"] = round(float(part.split("A")[1]) * 0.1, 2)
+            elif part[0] == "A":
+                message["current"] = (
+                    round(float(part.split("A")[1]) * 0.1, 2) if active else 0
+                )
             elif part[0] == "m":
                 message["current_rating"] = float(part.split("m")[1])
             elif part[0] == "M":
-                message["current_max"] = float(part.split("M")[1])
-            elif part[0] == "C":
-                message["current_max_charging"] = float(part.split("C")[1])
+                message["current_setting"] = float(part.split("M")[1])
             elif part[0] == "f":
                 message["frequency"] = round(float(part.split("f")[1]) * 0.01, 2)
             elif part[0] == "L":
                 message["energy_lifetime"] = float(part.split("L")[1])
             elif part[0] == "v":
                 message["protocol_version"] = part.split("v")[1]
-            elif part[0] == "E" and active:
-                message["energy_session"] = float(part.split("E")[1])
+            elif part[0] == "E":
+                message["energy_session"] = float(part.split("E")[1]) if active else 0
             elif part[0] == "t":
                 message["report_time"] = part.split("t")[1]
             elif part[0] == "v":
