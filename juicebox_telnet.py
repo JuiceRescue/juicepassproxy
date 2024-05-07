@@ -35,10 +35,8 @@ class JuiceboxTelnet:
             async with asyncio.timeout(self.timeout):
                 data = await self.reader.readuntil(match)
         except asyncio.TimeoutError as e:
-            # _LOGGER.warning(f"TimeoutError: readuntil (match: {match}, data: {data})")
             raise TimeoutError(f"readuntil (match: {match}, data: {data})") from e
         except ConnectionResetError as e:
-            # _LOGGER.warning(f"ConnectionResetError: readuntil (match: {match}, data: {data})")
             raise ConnectionResetError(
                 f"readuntil (match: {match}, data: {data})"
             ) from e
@@ -51,10 +49,8 @@ class JuiceboxTelnet:
                 self.writer.write(data)
                 await self.writer.drain()
         except TimeoutError as e:
-            # _LOGGER.warning(f"TimeoutError: write (data: {data})")
             raise TimeoutError(f"write (data: {data})") from e
         except ConnectionResetError as e:
-            # _LOGGER.warning(f"ConnectionResetError: write (data: {data})")
             raise ConnectionResetError(f"write (data: {data})") from e
         return True
 
@@ -67,10 +63,8 @@ class JuiceboxTelnet:
                     )
                 await self.readuntil(b">")
             except TimeoutError as e:
-                # _LOGGER.warning("TimeoutError: Open Telnet Connection Failed")
                 raise TimeoutError("Telnet Connection Failed") from e
             except ConnectionResetError as e:
-                # _LOGGER.warning("ConnectionResetError: Open Telnet Connection Failed")
                 raise ConnectionResetError("Telnet Connection Failed") from e
         # _LOGGER.debug("Telnet Opened")
         return True

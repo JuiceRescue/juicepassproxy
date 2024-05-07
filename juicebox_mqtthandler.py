@@ -37,11 +37,11 @@ class JuiceboxMQTTEntity:
         self._kwargs.update(
             {
                 "name": self.name,
-                "unique_id": f"{self._kwargs.get("juicebox_id", None)} {self.name}",
+                "unique_id": f"{self._kwargs.get('juicebox_id', None)} {self.name}",
             }
         )
         self.experimental = self._kwargs.get("experimental", False)
-        self._unique_id = f"{self._kwargs.get("juicebox_id", None)} {self.name}"
+        self._unique_id = f"{self._kwargs.get('juicebox_id', None)} {self.name}"
         self._mitm_handler = self._kwargs.get("mitm_handler", None)
         self._add_error = self._kwargs.get("add_error_func", None)
 
@@ -53,16 +53,10 @@ class JuiceboxMQTTEntity:
         entity_info_keys = getattr(
             ha_mqtt, f"{self.entity_type.title()}Info"
         ).__fields__.keys()
-        # _LOGGER.debug(f"Entity Info Keys: {entity_info_keys}")
         entity_info = {}
         for key in entity_info_keys:
             if self._kwargs.get(key, None) is not None:
                 entity_info.update({key: self._kwargs.get(key, None)})
-        # _LOGGER.debug(f"entity_info: {entity_info}")
-        # entity_info_class = (
-        #    getattr(ha_mqtt, f"{self.entity_type.title()}Info").parse_obj(entity_info),
-        # )
-        # _LOGGER.debug(f"entity_info_class: {entity_info_class}")
         self._mqtt = getattr(ha_mqtt, f"{self.entity_type.title()}")(
             Settings(
                 mqtt=self._kwargs.get("mqtt", self._kwargs.get("mqtt_settings", None)),
@@ -121,16 +115,10 @@ class JuiceboxMQTTSendingEntity(JuiceboxMQTTEntity):
         entity_info_keys = getattr(
             ha_mqtt, f"{self.entity_type.title()}Info"
         ).__fields__.keys()
-        # _LOGGER.debug(f"Entity Info Keys: {entity_info_keys}")
         entity_info = {}
         for key in entity_info_keys:
             if self._kwargs.get(key, None) is not None:
                 entity_info.update({key: self._kwargs.get(key, None)})
-        # _LOGGER.debug(f"entity_info: {entity_info}")
-        # entity_info_class = (
-        #    getattr(ha_mqtt, f"{self.entity_type.title()}Info").parse_obj(entity_info),
-        # )
-        # _LOGGER.debug(f"entity_info_class: {entity_info_class}")
         self._mqtt = getattr(ha_mqtt, f"{self.entity_type.title()}")(
             Settings(
                 mqtt=self._kwargs.get("mqtt", self._kwargs.get("mqtt_settings", None)),
@@ -421,8 +409,8 @@ class JuiceboxMQTTHandler:
         err_data = str(data).split("|")
         message["status"] = "unavailable"
         message["debug_message"] = (
-            f"JuiceboxMITM {err_data[1].title()} OSError {err_data[3]} [{
-                err_data[2]}]: {err_data[4]}"
+            f"JuiceboxMITM {err_data[1].title()} OSError {err_data[3]} "
+            f"[{err_data[2]}]: {err_data[4]}"
         )
         return message
 

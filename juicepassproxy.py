@@ -10,7 +10,8 @@ from pathlib import Path
 
 import dns
 import yaml
-from aiorun import run
+
+# from aiorun import run
 from const import (
     CONF_YAML,
     DEFAULT_DEVICE_NAME,
@@ -136,14 +137,14 @@ async def get_enelx_server_port(juicebox_host, telnet_timeout=None):
                     return connection["dest"]
     except TimeoutError as e:
         _LOGGER.warning(
-            f"Error in getting EnelX Server and Port via Telnet. ({
-                e.__class__.__qualname__}: {e})"
+            "Error in getting EnelX Server and Port via Telnet. "
+            f"({e.__class__.__qualname__}: {e})"
         )
         return None
     except ConnectionResetError as e:
         _LOGGER.warning(
-            f"Error in getting EnelX Server and Port via Telnet. ({
-                e.__class__.__qualname__}: {e})"
+            "Error in getting EnelX Server and Port via Telnet. "
+            f"({e.__class__.__qualname__}: {e})"
         )
         return None
     return None
@@ -160,14 +161,14 @@ async def get_juicebox_id(juicebox_host, telnet_timeout=None):
             return juicebox_id
     except TimeoutError as e:
         _LOGGER.warning(
-            f"Error in getting JuiceBox ID via Telnet. ({
-                e.__class__.__qualname__}: {e})"
+            "Error in getting JuiceBox ID via Telnet. "
+            f"({e.__class__.__qualname__}: {e})"
         )
         return None
     except ConnectionResetError as e:
         _LOGGER.warning(
-            f"Error in getting JuiceBox ID via Telnet. ({
-                e.__class__.__qualname__}: {e})"
+            "Error in getting JuiceBox ID via Telnet. "
+            f"({e.__class__.__qualname__}: {e})"
         )
         return None
     return None
@@ -361,8 +362,8 @@ async def main():
     if args.debug:
         _LOGGER.setLevel(logging.DEBUG)
     _LOGGER.warning(
-        f"Starting JuicePass Proxy {
-            VERSION} (Log Level: {logging.getLevelName(_LOGGER.getEffectiveLevel())})"
+        f"Starting JuicePass Proxy {VERSION} "
+        f"(Log Level: {logging.getLevelName(_LOGGER.getEffectiveLevel())})"
     )
     _LOGGER.info(f"log_loc: {log_loc}")
     if len(sys.argv) == 1:
@@ -417,8 +418,8 @@ async def main():
         and int(args.local_ip.split(":")[1]) != args.local_port
     ):
         _LOGGER.error(
-            f"Exiting: Local port conflict: --local_ip with port {
-                args.local_ip.split(":")[1]} and --local_port of {args.local_port}",
+            "Exiting: Local port conflict: --local_ip with port "
+            f"{args.local_ip.split(':')[1]} and --local_port of {args.local_port}"
         )
         sys.exit(1)
 
@@ -435,8 +436,8 @@ async def main():
         local_addr = ip_to_tuple(f"{local_ip}:{local_port}")
     else:
         local_addr = ip_to_tuple(
-            f"{config.get('LOCAL_IP', config.get('SRC', DEFAULT_LOCAL_IP))}:{
-                local_port}"
+            f"{config.get('LOCAL_IP', config.get('SRC', DEFAULT_LOCAL_IP))}:"
+            f"{local_port}"
         )
     config.update({"LOCAL_IP": local_addr[0]})
     _LOGGER.info(f"local_addr: {local_addr[0]}:{local_addr[1]}")
@@ -462,8 +463,8 @@ async def main():
         enelx_addr = ip_to_tuple(f"{enelx_server_ip}:{enelx_port}")
     else:
         enelx_addr = ip_to_tuple(
-            f"{config.get('ENELX_IP', config.get('DST', DEFAULT_ENELX_IP))}:{
-                enelx_port}"
+            f"{config.get('ENELX_IP', config.get('DST', DEFAULT_ENELX_IP))}:"
+            f"{enelx_port}"
         )
     config.update({"ENELX_IP": enelx_addr[0]})
     _LOGGER.info(f"enelx_addr: {enelx_addr[0]}:{enelx_addr[1]}")
@@ -563,8 +564,7 @@ async def main():
             )
         except Exception as e:
             _LOGGER.error(
-                f"A JuicePass Proxy task failed: {
-                    e.__class__.__qualname__}: {e}"
+                f"A JuicePass Proxy task failed: {e.__class__.__qualname__}: {e}"
             )
             await mqtt_handler.close()
             await mitm_handler.close()

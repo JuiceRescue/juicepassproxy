@@ -72,8 +72,8 @@ class JuiceboxMITM:
         ):
             if connect_attempt != 1:
                 _LOGGER.debug(
-                    f"Retrying UDP Server Startup. Attempt {
-                        connect_attempt} of {MAX_RETRY_ATTEMPT}"
+                    "Retrying UDP Server Startup. Attempt "
+                    f"{connect_attempt} of {MAX_RETRY_ATTEMPT}"
                 )
             connect_attempt += 1
             try:
@@ -121,8 +121,8 @@ class JuiceboxMITM:
                 continue
             except TimeoutError as e:
                 _LOGGER.warning(
-                    f"No Message Received after {
-                        MITM_RECV_TIMEOUT} sec. ({e.__class__.__qualname__}: {e})"
+                    f"No Message Received after {MITM_RECV_TIMEOUT} sec. "
+                    f"({e.__class__.__qualname__}: {e})"
                 )
                 await self._add_error()
                 self._dgram = None
@@ -132,14 +132,14 @@ class JuiceboxMITM:
                     await self._main_mitm_handler(data, remote_addr)
             except TimeoutError as e:
                 _LOGGER.warning(
-                    f"MITM Handler timeout after {
-                        MITM_HANDLER_TIMEOUT} sec. ({e.__class__.__qualname__}: {e})"
+                    f"MITM Handler timeout after {MITM_HANDLER_TIMEOUT} sec. "
+                    f"({e.__class__.__qualname__}: {e})"
                 )
                 await self._add_error()
                 self._dgram = None
         raise ChildProcessError(
-            f"JuiceboxMITM: More than {self._error_count} errors in the last {
-                ERROR_LOOKBACK_MIN} min."
+            f"JuiceboxMITM: More than {self._error_count} errors in the last "
+            f"{ERROR_LOOKBACK_MIN} min."
         )
 
     async def _main_mitm_handler(self, data: bytes, from_addr: tuple[str, int]):
@@ -157,12 +157,12 @@ class JuiceboxMITM:
                     await self.send_data(data, self._enelx_addr)
                 except OSError as e:
                     _LOGGER.warning(
-                        f"JuiceboxMITM OSError {
-                            errno.errorcode[e.errno]} [{self._enelx_addr}]: {e}"
+                        f"JuiceboxMITM OSError {errno.errorcode[e.errno]} "
+                        f"[{self._enelx_addr}]: {e}"
                     )
                     await self._local_mitm_handler(
-                        f"JuiceboxMITM_OSERROR|server|{self._enelx_addr}|{
-                            errno.errorcode[e.errno]}|{e}"
+                        f"JuiceboxMITM_OSERROR|server|{self._enelx_addr}|"
+                        f"{errno.errorcode[e.errno]}|{e}"
                     )
                     await self._add_error()
         elif self._juicebox_addr is not None and from_addr == self._enelx_addr:
@@ -172,12 +172,12 @@ class JuiceboxMITM:
                     await self.send_data(data, self._juicebox_addr)
                 except OSError as e:
                     _LOGGER.warning(
-                        f"JuiceboxMITM OSError {
-                            errno.errorcode[e.errno]} [{self._juicebox_addr}]: {e}"
+                        f"JuiceboxMITM OSError {errno.errorcode[e.errno]} "
+                        f"[{self._juicebox_addr}]: {e}"
                     )
                     await self._local_mitm_handler(
-                        f"JuiceboxMITM_OSERROR|client|{self._juicebox_addr}|{
-                            errno.errorcode[e.errno]}|{e}"
+                        f"JuiceboxMITM_OSERROR|client|{self._juicebox_addr}|"
+                        f"{errno.errorcode[e.errno]}|{e}"
                     )
                     await self._add_error()
             else:
@@ -193,8 +193,8 @@ class JuiceboxMITM:
         while not sent and send_attempt <= MAX_RETRY_ATTEMPT:
             if send_attempt != 1:
                 _LOGGER.warning(
-                    f"JuiceboxMITM Resending (Attempt: {send_attempt} of {MAX_RETRY_ATTEMPT}): {
-                        data} to {to_addr}"
+                    f"JuiceboxMITM Resending (Attempt: {send_attempt} of "
+                    f"{MAX_RETRY_ATTEMPT}): {data} to {to_addr}"
                 )
             send_attempt += 1
 
@@ -217,8 +217,8 @@ class JuiceboxMITM:
                             sent = True
             except TimeoutError as e:
                 _LOGGER.warning(
-                    f"Send Data timeout after {
-                        MITM_SEND_DATA_TIMEOUT} sec. ({e.__class__.__qualname__}: {e})"
+                    f"Send Data timeout after {MITM_SEND_DATA_TIMEOUT} sec. "
+                    f"({e.__class__.__qualname__}: {e})"
                 )
                 await self._add_error()
             await asyncio.sleep(max(blocking_time, 0.1))
