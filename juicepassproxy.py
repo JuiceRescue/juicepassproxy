@@ -6,14 +6,15 @@ import ipaddress
 import logging
 import socket
 import sys
+from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
 import dns
 import yaml
-
-# from aiorun import run
+from aiorun import run
 from const import (
     CONF_YAML,
+    DAYS_TO_KEEP_LOGS,
     DEFAULT_DEVICE_NAME,
     DEFAULT_ENELX_IP,
     DEFAULT_ENELX_PORT,
@@ -293,7 +294,7 @@ async def parse_args():
         help="Enables additional entities in Home Assistant that are in in development or can be used toward developing the ability to send commands to a JuiceBox.",
     )
     parser.add_argument(
-        "--ignore_remote",
+        "--ignore_enelx",
         action="store_true",
         help="If set, will not send commands received from EnelX to the JuiceBox nor send outgoing information from the JuiceBox to EnelX",
     )
@@ -355,7 +356,9 @@ async def main():
         level=DEFAULT_LOGLEVEL,
         handlers=[
             logging.StreamHandler(),
-            logging.FileHandler(log_loc, mode="a"),
+            TimedRotatingFileHandler(
+                log_loc, when="midnight", backupCount=DAYS_TO_KEEP_LOGS
+            ),
         ],
         force=True,
     )
@@ -491,11 +494,11 @@ async def main():
         experimental = False
     _LOGGER.info(f"experimental: {experimental}")
 
-    if args.ignore_remote:
-        ignore_remote = True
+    if args.ignore_enelx:
+        ignore_enelx = True
     else:
-        ignore_remote = False
-    _LOGGER.info(f"ignore_remote: {ignore_remote}")
+        ignore_enelx = False
+    _LOGGER.info(f"ignore_enelx: {ignore_enelx}")
 
     # Remove DST and SRC from Config as they have been replaced by ENELX_IP and LOCAL_IP respectively
     config.pop("DST", None)
@@ -532,7 +535,7 @@ async def main():
         mitm_handler = JuiceboxMITM(
             jpp_addr=local_addr,  # Local/Docker IP
             enelx_addr=enelx_addr,  # EnelX IP
-            ignore_remote=ignore_remote,
+            ignore_enelx=ignore_enelx,
             loglevel=_LOGGER.getEffectiveLevel(),
         )
         await mitm_handler.set_local_mitm_handler(mqtt_handler.local_mitm_handler)
@@ -584,5 +587,5 @@ async def main():
 
 
 if __name__ == "__main__":
-    # run(main(), stop_on_unhandled_errors=True)
-    asyncio.run(main())
+    run(main(), stop_on_unhandled_errors=True)
+    # asyncio.run(main())

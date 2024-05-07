@@ -4,7 +4,7 @@ import re
 import time
 
 import ha_mqtt_discoverable.sensors as ha_mqtt
-from const import ERROR_LOOKBACK_MIN, MAX_ERROR_COUNT, VERSION
+from const import ERROR_LOOKBACK_MIN, VERSION  # MAX_ERROR_COUNT,
 from ha_mqtt_discoverable import DeviceInfo, Settings
 from paho.mqtt.client import Client, MQTTMessage
 
@@ -26,8 +26,8 @@ class JuiceboxMQTTEntity:
         self.attributes = {}
         self._mqtt = None
         self._loop = asyncio.get_running_loop()
-        # self.entity_type
-        # self._set_func
+        # self.entity_type  # Each use of this class to create a child class needs to set this variable in __init__
+        # self._set_func  # Each use of this class to create a child class needs to set this variable in __init__
 
     def add_kwargs(self, **kwargs):
         self._kwargs.update(kwargs)
@@ -85,8 +85,9 @@ class JuiceboxMQTTEntity:
             if self._add_error is not None:
                 await self._add_error()
             _LOGGER.warning(
-                f"Can't update state for {
-                    self.name} as MQTT isn't connected/started. ({e.__class__.__qualname__}: {e})"
+                f"Can't update attribtutes for {self.name} "
+                "as MQTT isn't connected/started. "
+                f"({e.__class__.__qualname__}: {e})"
             )
 
     async def set_attributes(self, attr={}):
@@ -97,8 +98,9 @@ class JuiceboxMQTTEntity:
             if self._add_error is not None:
                 await self._add_error()
             _LOGGER.warning(
-                f"Can't update attribtutes for {
-                    self.name} as MQTT isn't connected/started. ({e.__class__.__qualname__}: {e})"
+                f"Can't update attribtutes for {self.name} "
+                "as MQTT isn't connected/started. "
+                f"({e.__class__.__qualname__}: {e})"
             )
 
 
@@ -139,6 +141,11 @@ class JuiceboxMQTTSendingEntity(JuiceboxMQTTEntity):
         self._loop.create_task(self._callback_async(client, user_data, message))
 
     async def _callback_async(self, client: Client, user_data, message: MQTTMessage):
+        """
+        Currently, this just sends the received message to the JuiceBox.
+        Likely, this callback will either need to be built out to build a working
+        CMD or the callback will call a method that builds a working CMD.
+        """
         state = message.payload.decode()
         _LOGGER.info(
             f"{self.entity_type.title()} Callback ({self.name}): {
@@ -148,7 +155,9 @@ class JuiceboxMQTTSendingEntity(JuiceboxMQTTEntity):
             _LOGGER.debug(f"Sending to MITM: {state}")
             await self._mitm_handler.send_data_to_juicebox(state.encode("utf-8"))
         else:
-            _LOGGER.debug(
+            if self._add_error is not None:
+                await self._add_error()
+            _LOGGER.warning(
                 f"Cannot send to MITM. mitm_handler type: {type(self._mitm_handler)}"
             )
         await self.set(state)
@@ -275,29 +284,28 @@ class JuiceboxMQTTHandler:
             ),
             "debug_message": JuiceboxMQTTSensor(
                 name="Last Debug Message",
-                expire_after=60,
+                # expire_after=60,
                 enabled_by_default=False,
                 icon="mdi:bug",
                 entity_category="diagnostic",
                 initial_state=f"INFO: Starting JuicePass Proxy {VERSION}",
             ),
-            "local_data": JuiceboxMQTTSensor(
-                name="Local Data",
+            "data_from_juicebox": JuiceboxMQTTSensor(
+                name="Data from JuiceBox",
                 experimental=True,
                 enabled_by_default=False,
                 entity_category="diagnostic",
             ),
-            "remote_data": JuiceboxMQTTSensor(
-                name="Remote Data",
+            "data_from_enelx": JuiceboxMQTTSensor(
+                name="Data from EnelX",
                 experimental=True,
                 enabled_by_default=False,
                 entity_category="diagnostic",
             ),
-            "send_local": JuiceboxMQTTText(
-                name="Send Local Command",
+            "send_to_juicebox": JuiceboxMQTTText(
+                name="Send Command to JuiceBox",
                 experimental=True,
                 enabled_by_default=False,
-                entity_category="diagnostic",
             ),
         }
         for entity in self._entities.values():
@@ -322,7 +330,6 @@ class JuiceboxMQTTHandler:
             *mqtt_task_list,
             # return_exceptions=True,
         )
-        _LOGGER.debug("JuiceboxMQTTHandler start method completed")
 
     async def close(self):
         for entity in self._entities.values():
@@ -401,7 +408,7 @@ class JuiceboxMQTTHandler:
         message["power"] = round(
             message.get("voltage", 0) * message.get("current", 0), 2
         )
-        message["local_data"] = data.decode("utf-8")
+        message["data_from_juicebox"] = data.decode("utf-8")
         return message
 
     async def _udp_mitm_oserror_message_parse(self, data):
@@ -416,13 +423,13 @@ class JuiceboxMQTTHandler:
 
     async def _debug_message_parse(self, data):
         message = {"type": "debug"}
+
         dbg_data = (
-            str(data)
+            data.decode("utf-8")
             .replace("https://", "https//")
             .replace("http://", "http//")
-            .split(":")
         )
-        dbg_level_abbr = dbg_data[1].split(",")[1]
+        dbg_level_abbr = dbg_data.split(":")[1].split(",")[1]
         if dbg_level_abbr == "NFO":
             dbg_level = "INFO"
         elif dbg_level_abbr == "WRN":
@@ -431,9 +438,9 @@ class JuiceboxMQTTHandler:
             dbg_level = "ERROR"
         else:
             dbg_level = dbg_level_abbr
-        dbg_msg = (
-            dbg_data[2].replace("https//", "https://").replace("http//", "http://")
-        )
+        dbg_data = dbg_data[dbg_data.find(":", dbg_data.find(":") + 1) + 1: -1]
+        dbg_msg = dbg_data.replace("https//", "https://").replace("http//", "http://")
+
         message["debug_message"] = f"{dbg_level}: {dbg_msg}"
         return message
 
@@ -447,8 +454,18 @@ class JuiceboxMQTTHandler:
             if entity and (entity.experimental is False or self._experimental is True):
                 await entity.set_state(message.get(k, None))
             attributes[k] = message.get(k, None)
-        if self._experimental and self._entities.get("local_data", None) is not None:
-            await self._entities.get("local_data").set_attributes(attributes)
+        if (
+            self._experimental
+            and self._entities.get("data_from_juicebox", None) is not None
+        ):
+            attributes.pop("data_from_juicebox", None)
+            attr_sorted = dict(sorted(attributes.items()))
+            unknown_attr = {}
+            for key in list(attr_sorted.keys()):
+                if key.startswith("unknown"):
+                    unknown_attr.update({key: attr_sorted.pop(key, None)})
+            attr_sorted.update(unknown_attr)
+            await self._entities.get("data_from_juicebox").set_attributes(attr_sorted)
         # except Exception as e:
         #    _LOGGER.exception(
         #        f"Failed to publish sensor data to MQTT. ({e.__class__.__qualname__}: {
@@ -460,9 +477,11 @@ class JuiceboxMQTTHandler:
             _LOGGER.debug(f"From EnelX: {data}")
             if (
                 self._experimental
-                and self._entities.get("remote_data", None) is not None
+                and self._entities.get("data_from_enelx", None) is not None
             ):
-                await self._entities.get("remote_data").set_state(data.decode("utf-8"))
+                await self._entities.get("data_from_enelx").set_state(
+                    data.decode("utf-8")
+                )
 
             return data
         except IndexError as e:

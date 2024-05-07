@@ -29,7 +29,7 @@ class JuiceboxMITM:
         jpp_addr,
         enelx_addr,
         local_mitm_handler=None,
-        ignore_remote=False,
+        ignore_enelx=False,
         remote_mitm_handler=None,
         mqtt_handler=None,
         loglevel=None,
@@ -39,7 +39,7 @@ class JuiceboxMITM:
         self._jpp_addr = jpp_addr
         self._enelx_addr = enelx_addr
         self._juicebox_addr = None
-        self._ignore_remote = ignore_remote
+        self._ignore_enelx = ignore_enelx
         self._local_mitm_handler = local_mitm_handler
         self._remote_mitm_handler = remote_mitm_handler
         self._mqtt_handler = mqtt_handler
@@ -152,7 +152,7 @@ class JuiceboxMITM:
 
         if from_addr == self._juicebox_addr:
             data = await self._local_mitm_handler(data)
-            if not self._ignore_remote:
+            if not self._ignore_enelx:
                 try:
                     await self.send_data(data, self._enelx_addr)
                 except OSError as e:
@@ -166,7 +166,7 @@ class JuiceboxMITM:
                     )
                     await self._add_error()
         elif self._juicebox_addr is not None and from_addr == self._enelx_addr:
-            if not self._ignore_remote:
+            if not self._ignore_enelx:
                 data = await self._remote_mitm_handler(data)
                 try:
                     await self.send_data(data, self._juicebox_addr)

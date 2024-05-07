@@ -9,6 +9,7 @@ LOGFILE = "juicepassproxy.log"
 LOG_FORMAT = "%(asctime)-20s %(levelname)-9s [%(name)s] %(message)s"
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 DEFAULT_LOGLEVEL = logging.INFO
+DAYS_TO_KEEP_LOGS = 14
 
 # Defaults
 DEFAULT_ENELX_SERVER = "juicenet-udp-prod3-usa.enelx.com"

@@ -84,11 +84,11 @@ if [[ -v UPDATE_UDPC ]] && $UPDATE_UDPC; then
 else
   logger INFO "UPDATE_UDPC: false"
 fi
-if [[ -v IGNORE_REMOTE ]] && $IGNORE_REMOTE; then
-  JPP_STRING+=" --ignore_remote"
-  logger INFO "IGNORE_REMOTE: true"
+if [[ -v IGNORE_ENELX ]] && $IGNORE_ENELX; then
+  JPP_STRING+=" --ignore_enelx"
+  logger INFO "IGNORE_ENELX: true"
 else
-  logger INFO "IGNORE_REMOTE: false"
+  logger INFO "IGNORE_ENELX: false"
 fi
 if [[ -v EXPERIMENTAL ]] && $EXPERIMENTAL; then
   JPP_STRING+=" --experimental"
