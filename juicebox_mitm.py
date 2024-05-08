@@ -3,9 +3,7 @@ import errno
 import logging
 import time
 
-# Temporary until asyncio_dgram release is updated to include reuse_port attribute in bind
-# import asyncio_dgram
-import asyncio_dgram_local as asyncio_dgram
+import asyncio_dgram
 from const import (
     ERROR_LOOKBACK_MIN,
     MAX_ERROR_COUNT,
@@ -14,6 +12,9 @@ from const import (
     MITM_RECV_TIMEOUT,
     MITM_SEND_DATA_TIMEOUT,
 )
+
+# Temporary until asyncio_dgram release is updated to include reuse_port attribute in bind
+# import asyncio_dgram_local as asyncio_dgram
 
 # https://github.com/rsc-dev/pyproxy MIT
 # https://github.com/lucas-six/python-cookbook Apache 2.0
