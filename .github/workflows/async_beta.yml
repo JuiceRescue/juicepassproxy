@@ -1,18 +1,21 @@
-name: Build and Publish GitHub Container Docker Image
+name: async_beta - Build and Publish GitHub Container Docker Image
 on:
   release:
     types: [published, edited]
   push:
     branches:
-      - main
-      - master
+      - async_beta
   workflow_dispatch:
 
 jobs:
-  build_and_publish_docker_image:
-    if: github.repository_owner == 'snicker'
+  async_beta_build_and_publish_docker_image:
+    if: github.repository_owner == 'snicker' && (github.event.release.target_commitish == 'async_beta' || github.ref_name == 'async_beta')
     runs-on: ubuntu-latest
-    steps:      
+    steps:
+      - name: GitHub Context
+        env:
+          GITHUB_CONTEXT: ${{ toJSON(github) }}
+        run: echo "$GITHUB_CONTEXT"    
       - name: Debug Variables
         run: |
             echo "github.event_name: ${{ github.event_name }}"
@@ -27,28 +30,15 @@ jobs:
         uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Update Version in const.py
-        if: ${{ github.event_name == 'release' && github.event.repository.default_branch == github.event.release.target_commitish && github.event.release.prerelease == false && github.event.release.draft == false }}
-        run: |
-          sed -i 's/VERSION \= \".*\"/VERSION \= \"${{ github.ref_name }}\"/' ./const.py
-      - name: Commit & Push Version Changes
-        if: ${{ github.event_name == 'release' && github.event.repository.default_branch == github.event.release.target_commitish && github.event.release.prerelease == false && github.event.release.draft == false }}
-        uses: actions-js/push@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ github.event.repository.default_branch }}
-          message: "Updating to version ${{ github.ref_name }}"
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
           flavor: |
-            latest=auto
+            latest=false
           tags: |
-            type=edge,branch=main
-            type=edge,branch=master
-            type=semver,pattern={{version}}
+            type=raw, value=async_beta
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:

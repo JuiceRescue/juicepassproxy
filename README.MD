@@ -83,6 +83,7 @@ Variable | Required | Description & Default |
 -- | -- | --
 **JUICEBOX_HOST** | **Recommended**</br></br>**Required if Update UDPC is True.** | If defined, will attempt to get the EnelX Server Name, IP, and Port using telnet.
 **UPDATE_UDPC** | No | Default: false. If true, will continually update the JuiceBox via telnet to point to JuicePass Proxy.
+**TELNET_TIMEOUT** | No | Default: 30. Timeout in seconds for telnet operations.
 **JPP_HOST**  | **Required if Update UDPC is True** |  This is the IP or Hostname of the machine where JuicePass Proxy is running (**not** the IP of the Docker Container)
 **MQTT_HOST** | No | 127.0.0.1
 **MQTT_PORT** | No | 1883
