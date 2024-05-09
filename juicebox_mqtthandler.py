@@ -79,7 +79,6 @@ class JuiceboxMQTTEntity:
     async def set(self, state=None):
         self._state = state
         try:
-            # self._mqtt.set_state(state)
             getattr(self._mqtt, self._set_func)(state)
         except AttributeError as e:
             if self._add_error is not None:
@@ -328,7 +327,6 @@ class JuiceboxMQTTHandler:
                 mqtt_task_list.append(asyncio.create_task(entity.start()))
         await asyncio.gather(
             *mqtt_task_list,
-            # return_exceptions=True,
         )
 
     async def close(self):
