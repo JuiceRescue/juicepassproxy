@@ -340,7 +340,7 @@ class JuiceboxMQTTHandler:
                 entity.add_kwargs(mitm_handler=mitm_handler)
 
     async def _basic_message_parse(self, data: bytes):
-        message = {"type": "basic"}
+        message = {"type": "basic", "current": 0, "energy_session": 0}
         active = True
         parts = re.split(r",|!|:", data.decode("utf-8"))
         parts.pop(0)  # JuiceBox ID
