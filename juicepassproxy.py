@@ -563,7 +563,6 @@ async def main():
         try:
             await asyncio.gather(
                 *jpp_task_list,
-                # return_exceptions=True,
             )
         except Exception as e:
             _LOGGER.error(
@@ -588,4 +587,3 @@ async def main():
 
 if __name__ == "__main__":
     run(main(), stop_on_unhandled_errors=True)
-    # asyncio.run(main())

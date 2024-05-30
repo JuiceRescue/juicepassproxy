@@ -13,12 +13,7 @@ from const import (
     MITM_SEND_DATA_TIMEOUT,
 )
 
-# Temporary until asyncio_dgram release is updated to include reuse_port attribute in bind
-# import asyncio_dgram_local as asyncio_dgram
-
-# https://github.com/rsc-dev/pyproxy MIT
-# https://github.com/lucas-six/python-cookbook Apache 2.0
-# https://github.com/dannerph/keba-kecontact MIT
+# Began with https://github.com/rsc-dev/pyproxy and rewrote when moving to async.
 
 _LOGGER = logging.getLogger(__name__)
 

@@ -40,7 +40,6 @@ class JuiceboxTelnet:
             raise ConnectionResetError(
                 f"readuntil (match: {match}, data: {data})"
             ) from e
-        # _LOGGER.debug(f"readuntil data: {data}")
         return data
 
     async def write(self, data: bytes):
