@@ -399,19 +399,15 @@ async def main():
     if telnet_timeout == 0:
         telnet_timeout = None
 
-    if args.ignore_enelx:
-        ignore_enelx = True
-    else:
-        ignore_enelx = False
+    ignore_enelx = args.ignore_enelx
     _LOGGER.info(f"ignore_enelx: {ignore_enelx}")
 
+    enelx_server_port = None
     if not ignore_enelx:
         enelx_server_port = await get_enelx_server_port(
             args.juicebox_host, telnet_timeout=telnet_timeout
         )
-    else:
-       enelx_server_port = None
-       
+
     if enelx_server_port:
         _LOGGER.debug(f"enelx_server_port: {enelx_server_port}")
         enelx_server = enelx_server_port.split(":")[0]
@@ -498,12 +494,8 @@ async def main():
             "Cannot get JuiceBox ID from Telnet and not in Config. If a JuiceBox ID is later set or is obtained via Telnet, it will likely create a new JuiceBox Device with new Entities in Home Assistant."
         )
 
-    if args.experimental:
-        experimental = True
-    else:
-        experimental = False
+    experimental = args.experimental
     _LOGGER.info(f"experimental: {experimental}")
-
 
     # Remove DST and SRC from Config as they have been replaced by ENELX_IP and LOCAL_IP respectively
     config.pop("DST", None)
