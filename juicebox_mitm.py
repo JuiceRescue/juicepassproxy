@@ -13,9 +13,7 @@ from const import (
     MITM_SEND_DATA_TIMEOUT,
 )
 
-# https://github.com/rsc-dev/pyproxy MIT
-# https://github.com/lucas-six/python-cookbook Apache 2.0
-# https://github.com/dannerph/keba-kecontact MIT
+# Began with https://github.com/rsc-dev/pyproxy and rewrote when moving to async.
 
 _LOGGER = logging.getLogger(__name__)
 

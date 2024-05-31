@@ -79,7 +79,6 @@ class JuiceboxMQTTEntity:
     async def set(self, state=None):
         self._state = state
         try:
-            # self._mqtt.set_state(state)
             getattr(self._mqtt, self._set_func)(state)
         except AttributeError as e:
             if self._add_error is not None:
@@ -328,7 +327,6 @@ class JuiceboxMQTTHandler:
                 mqtt_task_list.append(asyncio.create_task(entity.start()))
         await asyncio.gather(
             *mqtt_task_list,
-            # return_exceptions=True,
         )
 
     async def close(self):
@@ -342,7 +340,7 @@ class JuiceboxMQTTHandler:
                 entity.add_kwargs(mitm_handler=mitm_handler)
 
     async def _basic_message_parse(self, data: bytes):
-        message = {"type": "basic", "current" : 0, "energy_session" : 0}
+        message = {"type": "basic", "current": 0, "energy_session": 0}
         active = True
         parts = re.split(r",|!|:", data.decode("utf-8"))
         parts.pop(0)  # JuiceBox ID
