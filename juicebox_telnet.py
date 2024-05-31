@@ -1,86 +1,140 @@
-from telnetlib import Telnet
+import asyncio
+import logging
+
+import telnetlib3
+
+_LOGGER = logging.getLogger(__name__)
 
 
-class JuiceboxTelnet(object):
-    def __init__(self, host, port=2000, timeout=None):
+class JuiceboxTelnet:
+    def __init__(self, host, port=2000, timeout=None, loglevel=None):
+        if loglevel is not None:
+            _LOGGER.setLevel(loglevel)
         self.host = host
         self.port = port
-        self.connection = None
+        self.reader = None
+        self.writer = None
         self.timeout = timeout
 
-    def __enter__(self):
-        self.connection = self.open()
-        return self
+    async def __aenter__(self):
+        if await self.open():
+            return self
+        return None
 
-    def __exit__(self, exc_type, exc_value, exc_tb):
-        if self.connection:
-            self.connection.close()
-        self.connection = None
+    async def __aexit__(self, exc_type, exc_value, exc_tb):
+        if self.reader:
+            self.reader.close()
+        self.reader = None
+        if self.writer:
+            self.writer.close()
+        self.writer = None
 
-    def open(self):
-        if not self.connection:
-            self.connection = Telnet(host=self.host, port=self.port, timeout=self.timeout)
-            self.connection.read_until(b">", self.timeout)
-        return self.connection
+    async def readuntil(self, match: bytes):
+        data = b""
+        try:
+            async with asyncio.timeout(self.timeout):
+                data = await self.reader.readuntil(match)
+        except asyncio.TimeoutError as e:
+            raise TimeoutError(f"readuntil (match: {match}, data: {data})") from e
+        except ConnectionResetError as e:
+            raise ConnectionResetError(
+                f"readuntil (match: {match}, data: {data})"
+            ) from e
+        return data
 
-    def list(self):
-        tn = self.open()
-        tn.write(b"\n")
-        tn.read_until(b"> ", self.timeout)
-        tn.write(b"list\n")
-        tn.read_until(b"list\r\n! ", self.timeout)
-        res = tn.read_until(b">", self.timeout)
-        lines = str(res[:-3]).split("\\r\\n")
+    async def write(self, data: bytes):
+        try:
+            async with asyncio.timeout(self.timeout):
+                self.writer.write(data)
+                await self.writer.drain()
+        except TimeoutError as e:
+            raise TimeoutError(f"write (data: {data})") from e
+        except ConnectionResetError as e:
+            raise ConnectionResetError(f"write (data: {data})") from e
+        return True
+
+    async def open(self):
+        if self.reader is None or self.writer is None:
+            try:
+                async with asyncio.timeout(self.timeout):
+                    self.reader, self.writer = await telnetlib3.open_connection(
+                        self.host, self.port, encoding=False
+                    )
+                await self.readuntil(b">")
+            except TimeoutError as e:
+                raise TimeoutError("Telnet Connection Failed") from e
+            except ConnectionResetError as e:
+                raise ConnectionResetError("Telnet Connection Failed") from e
+        # _LOGGER.debug("Telnet Opened")
+        return True
+
+    async def close(self):
+        if self.reader:
+            self.reader.close()
+        self.reader = None
+        if self.writer:
+            self.writer.close()
+        self.writer = None
+
+    async def get_udpc_list(self):
         out = []
-        for line in lines[1:]:
-            parts = line.split(" ")
-            if len(parts) >= 5:
-                out.append({"id": parts[1], "type": parts[2], "dest": parts[4]})
+        if await self.open():
+            await self.write(b"\n")
+            await self.readuntil(b"> ")
+            await self.write(b"list\n")
+            await self.readuntil(b"list\r\n! ")
+            res = await self.readuntil(b">")
+            lines = str(res[:-3]).split("\\r\\n")
+            for line in lines[1:]:
+                parts = line.split(" ")
+                if len(parts) >= 5:
+                    out.append({"id": parts[1], "type": parts[2], "dest": parts[4]})
         return out
 
-    def get(self, variable):
-        tn = self.open()
-        tn.write(b"\n")
-        tn.read_until(b"> ", self.timeout)
-        cmd = f"get {variable}\r\n".encode("ascii")
-        tn.write(cmd)
-        tn.read_until(cmd, self.timeout)
-        res = tn.read_until(b">", self.timeout)
-        return {variable: str(res[:-1].strip())}
+    async def get_variable(self, variable) -> bytes:
+        if await self.open():
+            await self.write(b"\n")
+            await self.readuntil(b"> ")
+            cmd = f"get {variable}\r\n".encode("ascii")
+            await self.write(cmd)
+            await self.readuntil(cmd)
+            res = await self.readuntil(b">")
+            return res[:-1].strip()
+        return None
 
-    def get_all(self):
-        tn = self.open()
-        tn.write(b"\n")
-        tn.read_until(b">", self.timeout)
-        cmd = "get all\r\n".encode("ascii")
-        tn.write(cmd)
-        tn.read_until(cmd, self.timeout)
-        res = tn.read_until(b">", self.timeout)
-        lines = str(res[:-1]).split("\\r\\n")
+    async def get_all_variables(self):
         vars = {}
-        for line in lines:
-            parts = line.split(": ")
-            if len(parts) == 2:
-                vars[parts[0]] = parts[1]
+        if await self.open():
+            await self.write(b"\n")
+            await self.readuntil(b">")
+            cmd = "get all\r\n".encode("ascii")
+            await self.write(cmd)
+            await self.readuntil(cmd)
+            res = await self.readuntil(b">")
+            lines = str(res[:-1]).split("\\r\\n")
+            for line in lines:
+                parts = line.split(": ")
+                if len(parts) == 2:
+                    vars[parts[0]] = parts[1]
         return vars
 
-    def stream_close(self, id):
-        tn = self.open()
-        tn.write(b"\n")
-        tn.read_until(b">", self.timeout)
-        tn.write(f"stream_close {id}\n".encode("ascii"))
-        tn.read_until(b">", self.timeout)
+    async def close_udpc_stream(self, id):
+        if await self.open():
+            await self.write(b"\n")
+            await self.readuntil(b">")
+            await self.write(f"stream_close {id}\n".encode("ascii"))
+            await self.readuntil(b">")
 
-    def udpc(self, host, port):
-        tn = self.open()
-        tn.write(b"\n")
-        tn.read_until(b">", self.timeout)
-        tn.write(f"udpc {host} {port}\n".encode("ascii"))
-        tn.read_until(b">", self.timeout)
+    async def write_udpc_stream(self, host, port):
+        if await self.open():
+            await self.write(b"\n")
+            await self.readuntil(b">")
+            await self.write(f"udpc {host} {port}\n".encode("ascii"))
+            await self.readuntil(b">")
 
-    def save(self):
-        tn = self.open()
-        tn.write(b"\n")
-        tn.read_until(b">", self.timeout)
-        tn.write(b"save\n")
-        tn.read_until(b">", self.timeout)
+    async def save_udpc(self):
+        if await self.open():
+            await self.write(b"\n")
+            await self.readuntil(b">")
+            await self.write(b"save\n")
+            await self.readuntil(b">")

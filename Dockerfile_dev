@@ -1,4 +1,4 @@
-FROM python:3.12-slim-bookworm
+FROM python:3.13-rc-slim-bookworm
 
 LABEL org.opencontainers.image.source=https://github.com/snicker/juicepassproxy
 
@@ -10,8 +10,10 @@ RUN apt-get install -y tini git curl
 RUN mkdir -p /juicepassproxy
 RUN mkdir -p /log
 RUN mkdir -p /config
-COPY * /juicepassproxy
+COPY requirements.txt /juicepassproxy
 RUN pip install --root-user-action=ignore --no-cache-dir -r /juicepassproxy/requirements.txt
+COPY * /juicepassproxy
 RUN chmod -f +x /juicepassproxy/*.sh
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/juicepassproxy/docker_entrypoint.sh"]
+#ENTRYPOINT ["/usr/bin/tini", "--", "/juicepassproxy/docker_entrypoint.sh"]
+ENTRYPOINT ["/juicepassproxy/docker_entrypoint.sh"]

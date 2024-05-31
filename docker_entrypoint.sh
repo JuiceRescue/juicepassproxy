@@ -4,7 +4,7 @@ JUICEPASSPROXY="/juicepassproxy/juicepassproxy.py"
 
 function logger() {
   if [ "${1^^}" != "DEBUG" ] || ($DEBUG && [ "${1^^}" = "DEBUG" ]); then
-    printf "%-15s %-10s %s\n" "$(date +'%Y-%m-%d %H:%M:%S,%3N')" "${1^^}" "${2}"
+    printf "%-20s %-9s [entrypoint.sh] %s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "${1^^}" "${2}"
   fi
 }
 
@@ -26,13 +26,23 @@ if [[ ! -z "${JUICEBOX_ID}" ]]; then
   logger INFO "JUICEBOX_ID: ${JUICEBOX_ID}"
   JPP_STRING+=" --juicebox_id ${JUICEBOX_ID}"
 fi
-if [[ ! -z "${SRC}" ]]; then
-  logger INFO "SRC: ${SRC}"
-  JPP_STRING+=" --src ${SRC}"
+if [[ ! -z "${LOCAL_IP}" ]]; then
+  logger INFO "LOCAL_IP: ${LOCAL_IP}"
+  JPP_STRING+=" --local_ip ${LOCAL_IP}"
+elif [[ ! -z "${SRC}" ]]; then
+  logger INFO "LOCAL_IP: ${SRC}"
+  JPP_STRING+=" --local_ip ${SRC}"
 fi
-if [[ ! -z "${DST}" ]]; then
-  logger INFO "DST: ${DST}"
-  JPP_STRING+=" --dst ${DST}"
+if [[ ! -z "${LOCAL_PORT}" ]]; then
+  logger INFO "LOCAL_PORT: ${LOCAL_PORT}"
+  JPP_STRING+=" --local_port ${LOCAL_PORT}"
+fi
+if [[ ! -z "${ENELX_IP}" ]]; then
+  logger INFO "ENELX_IP: ${ENELX_IP}"
+  JPP_STRING+=" --enelx_ip ${ENELX_IP}"
+elif [[ ! -z "${DST}" ]]; then
+  logger INFO "ENELX_IP: ${DST}"
+  JPP_STRING+=" --enelx_ip ${DST}"
 fi
 if [[ ! -z "${MQTT_HOST}" ]]; then
   logger INFO "MQTT_HOST: ${MQTT_HOST}"
@@ -58,19 +68,34 @@ if [[ ! -z "${JPP_HOST}" ]]; then
   logger INFO "JPP_HOST: ${JPP_HOST}"
   JPP_STRING+=" --juicepass_proxy_host ${JPP_HOST}"
 fi
-logger INFO "UPDATE_UDPC: ${UPDATE_UDPC}"
-if $UPDATE_UDPC; then
-  JPP_STRING+=" --update_udpc"
-fi
 if [[ ! -z "${TELNET_TIMEOUT}" ]]; then
   logger INFO "TELNET_TIMEOUT: ${TELNET_TIMEOUT}"
   JPP_STRING+=" --telnet_timeout ${TELNET_TIMEOUT}"
 fi
 JPP_STRING+=" --config_loc /config"
+JPP_STRING+=" --log_loc /log"
 logger INFO "DEBUG: ${DEBUG}"
 if $DEBUG; then
   JPP_STRING+=" --debug"
 fi
+if [[ -v UPDATE_UDPC ]] && $UPDATE_UDPC; then
+  JPP_STRING+=" --update_udpc"
+  logger INFO "UPDATE_UDPC: true"
+else
+  logger INFO "UPDATE_UDPC: false"
+fi
+if [[ -v IGNORE_ENELX ]] && $IGNORE_ENELX; then
+  JPP_STRING+=" --ignore_enelx"
+  logger INFO "IGNORE_ENELX: true"
+else
+  logger INFO "IGNORE_ENELX: false"
+fi
+if [[ -v EXPERIMENTAL ]] && $EXPERIMENTAL; then
+  JPP_STRING+=" --experimental"
+  logger INFO "EXPERIMENTAL: true"
+else
+  logger INFO "EXPERIMENTAL: false"
+fi
 
 logger DEBUG "COMMAND: $(echo ${JPP_STRING} | sed -E 's/(.* --mqtt_password )([\"]?[a-zA-Z0-9_\?\*\^\&\#\@\!]+[\"]?)/\1*****/g')"
-eval ${JPP_STRING}
+exec ${JPP_STRING}
