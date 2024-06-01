@@ -12,6 +12,7 @@ from const import (
     MITM_RECV_TIMEOUT,
     MITM_SEND_DATA_TIMEOUT,
 )
+from juicebox_message import JuiceboxMessage, JuiceboxCommand
 
 # Began with https://github.com/rsc-dev/pyproxy and rewrote when moving to async.
 
@@ -45,6 +46,10 @@ class JuiceboxMITM:
         self._dgram = None
         self._error_count = 0
         self._error_timestamp_list = []
+        # Last command sent to juicebox device
+        self._last_command = None
+        # Last message received from juicebox device
+        self._last_message = None
 
     async def start(self) -> None:
         _LOGGER.info("Starting JuiceboxMITM")
@@ -147,6 +152,10 @@ class JuiceboxMITM:
             self._juicebox_addr = from_addr
 
         if from_addr == self._juicebox_addr:
+            try:
+                self._last_message = JuiceboxMessage().from_string(data.decode("utf-8"))
+            except Exception as e:
+                _LOGGER.exception(f"Not a valid juicebox message {data}")
             data = await self._local_mitm_handler(data)
             if not self._ignore_enelx:
                 try:
@@ -225,6 +234,35 @@ class JuiceboxMITM:
 
     async def send_data_to_juicebox(self, data: bytes):
         await self.send_data(data, self._juicebox_addr)
+
+
+    def is_mqtt_entity_defined(self, entity_name):
+        return self._mqtt_handler.get_entity(entity_name) and self._mqtt_handler.get_entity(entity_name).state
+        
+    def __build_cmd_message(self):
+       _LOGGER.info(f"last_message = {self._last_message}")
+       
+       new_version = self._last_message and (self._last_message.get_value("v") == "09u")
+       if self._last_command:
+          message = JuiceboxCommand(previous=self._last_command, new_version=new_version)
+       else:
+          message = JuiceboxCommand(new_version=new_version)
+          
+       message.offline_amperage = int(self._mqtt_handler.get_entity("current_max").state)
+       message.instant_amperage = int(self._mqtt_handler.get_entity("current_max_charging").state)
+
+       _LOGGER.info(f"message = {message}")
+
+       self._last_command = message;
+       return message.build()
+
+    async def send_cmd_message_to_juicebox(self):
+       if self.is_mqtt_entity_defined("current_max") and self.is_mqtt_entity_defined("current_max_charging"):
+          cmd_message = self.__build_cmd_message()
+          _LOGGER.info(f"Sending command to juicebox {cmd_message}")
+          await self.send_data(cmd_message.encode('utf-8'), self._juicebox_addr)
+       else:
+          _LOGGER.warn("Unable to send command to juicebox before current_max and current_max_charging values are set") 
 
     async def set_mqtt_handler(self, mqtt_handler):
         self._mqtt_handler = mqtt_handler

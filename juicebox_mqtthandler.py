@@ -79,12 +79,16 @@ class JuiceboxMQTTEntity:
     async def set(self, state=None):
         self._state = state
         try:
-            getattr(self._mqtt, self._set_func)(state)
+            if self.entity_type == 'number':
+                # float to be used by any number, JuiceboxMessage will use int
+                getattr(self._mqtt, self._set_func)(float(state))
+            else:
+                getattr(self._mqtt, self._set_func)(state)
         except AttributeError as e:
             if self._add_error is not None:
                 await self._add_error()
             _LOGGER.warning(
-                f"Can't update attribtutes for {self.name} "
+                f"Can't update attributes for {self.name} "
                 "as MQTT isn't connected/started. "
                 f"({e.__class__.__qualname__}: {e})"
             )
@@ -133,6 +137,8 @@ class JuiceboxMQTTSendingEntity(JuiceboxMQTTEntity):
 
         if self._kwargs.get("initial_state", None) is not None:
             await self.set(self._kwargs.get("initial_state", None))
+        elif self.entity_type == 'number':
+            _LOGGER.warning(f"{self.name} has no initial_state")
         else:
             await self.set(self.name)
 
@@ -151,8 +157,13 @@ class JuiceboxMQTTSendingEntity(JuiceboxMQTTEntity):
                 state}. User Data: {user_data}"
         )
         if self._mitm_handler:
-            _LOGGER.debug(f"Sending to MITM: {state}")
-            await self._mitm_handler.send_data_to_juicebox(state.encode("utf-8"))
+            if user_data == 'RAW':
+                _LOGGER.debug(f"Sending to MITM: {state}")
+                await self._mitm_handler.send_data_to_juicebox(state.encode("utf-8"))
+            else:
+                # Internal state must be set before seding message to juicebox
+                await self.set(state)
+                await self._mitm_handler.send_cmd_message_to_juicebox()
         else:
             if self._add_error is not None:
                 await self._add_error()
@@ -172,6 +183,20 @@ class JuiceboxMQTTSensor(JuiceboxMQTTEntity):
         self.entity_type = "sensor"
         self._set_func = "set_state"
         super().__init__(name, **kwargs)
+
+
+class JuiceboxMQTTNumber(JuiceboxMQTTSendingEntity):
+    def __init__(
+        self,
+        name,
+        **kwargs,
+    ):
+        # _LOGGER.debug(f"Number Init: {name}")
+        self.entity_type = "number"
+        self._set_func = "set_value"
+        super().__init__(name, **kwargs)
+
+
 
 
 class JuiceboxMQTTText(JuiceboxMQTTSendingEntity):
@@ -195,6 +220,7 @@ class JuiceboxMQTTHandler:
         device_name,
         mqtt_settings,
         experimental,
+        max_current,
         juicebox_id=None,
         mitm_handler=None,
         loglevel=None,
@@ -206,6 +232,7 @@ class JuiceboxMQTTHandler:
         self._juicebox_id = juicebox_id
         self._experimental = experimental
         self._mitm_handler = mitm_handler
+        self._max_current = max_current
         self._error_count = 0
         self._error_timestamp_list = []
 
@@ -244,6 +271,20 @@ class JuiceboxMQTTHandler:
                 state_class="measurement",
                 device_class="current",
                 unit_of_measurement="A",
+            ),
+            "current_max": JuiceboxMQTTNumber(
+                name="Max Current",
+                device_class="current",
+                unit_of_measurement="A",
+                min=0,
+                max=self._max_current,
+            ),
+            "current_max_charging": JuiceboxMQTTNumber(
+                name="Max Charging Current",
+                device_class="current",
+                unit_of_measurement="A",
+                min=0,
+                max=self._max_current,
             ),
             "frequency": JuiceboxMQTTSensor(
                 name="Frequency",
@@ -303,6 +344,7 @@ class JuiceboxMQTTHandler:
             ),
             "send_to_juicebox": JuiceboxMQTTText(
                 name="Send Command to JuiceBox",
+                user_data="RAW",
                 experimental=True,
                 enabled_by_default=False,
             ),
@@ -317,6 +359,9 @@ class JuiceboxMQTTHandler:
             if entity.entity_type in MQTT_SENDING_ENTITIES:
                 entity.add_kwargs(mitm_handler=self._mitm_handler)
 
+    def get_entity(self, name):
+        return self._entities[name]
+        
     async def start(self):
         _LOGGER.info("Starting JuiceboxMQTTHandler")
 
@@ -380,7 +425,9 @@ class JuiceboxMQTTHandler:
             elif part[0] == "m":
                 message["current_rating"] = float(part.split("m")[1])
             elif part[0] == "M":
-                message["current_setting"] = float(part.split("M")[1])
+                message["current_max"] = float(part.split("M")[1])
+            elif part[0] == "C":
+                message["current_max_charging"] = float(part.split("C")[1])
             elif part[0] == "f":
                 message["frequency"] = round(float(part.split("f")[1]) * 0.01, 2)
             elif part[0] == "L":
