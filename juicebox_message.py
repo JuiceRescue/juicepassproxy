@@ -140,10 +140,13 @@ class JuiceboxCommand(JuiceboxMessage):
         #     Instant amperage may need to be represented using 4 digits (e.g. 0040) on newer Juicebox versions.
         # mine wich send data using version 09u works with 4 digits on offline and 3 digit on instant
         #    sizes got from original packet dump when communicating with enel x server
+        #
+        # https://github.com/snicker/juicepassproxy/issues/39#issuecomment-2002312548
+        #   @FalconFour definition of currents
         if self.new_version:
-            self.payload_str = f"CMD{weekday}{self.time.strftime('%H%M')}A{self.offline_amperage:04d}M{self.instant_amperage:03d}C{self.command:03d}S{self.counter:03d}"
+            self.payload_str = f"CMD{weekday}{self.time.strftime('%H%M')}A{self.instant_amperage:04d}M{self.offline_amperage:03d}C{self.command:03d}S{self.counter:03d}"
         else:
-            self.payload_str = f"CMD{weekday}{self.time.strftime('%H%M')}A{self.offline_amperage:02d}M{self.instant_amperage:02d}C{self.command:03d}S{self.counter:03d}"
+            self.payload_str = f"CMD{weekday}{self.time.strftime('%H%M')}A{self.instant_amperage:02d}M{self.offline_amperage:02d}C{self.command:03d}S{self.counter:03d}"
         self.checksum_str = self.checksum_computed()
 
     def parse_values(self):

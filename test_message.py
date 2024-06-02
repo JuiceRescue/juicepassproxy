@@ -7,8 +7,8 @@ class TestMessage(unittest.TestCase):
     def test_message_building(self):
         m = JuiceboxCommand()
         m.time = datetime.datetime(2012, 3, 23, 23, 24, 55, 173504)
-        m.offline_amperage = 20
-        m.instant_amperage = 16
+        m.offline_amperage = 16
+        m.instant_amperage = 20
         print(m.build())
         print(m.inspect())
         self.assertEqual(m.build(), "CMD52324A20M16C006S001!5RE$")
@@ -17,8 +17,8 @@ class TestMessage(unittest.TestCase):
     def test_message_building_new(self):
         m = JuiceboxCommand(new_version=True)
         m.time = datetime.datetime(2012, 3, 23, 23, 24, 55, 173504)
-        m.offline_amperage = 20
-        m.instant_amperage = 16
+        m.offline_amperage = 16
+        m.instant_amperage = 20
         print(m.build())
         print(m.inspect())
         self.assertEqual(m.build(), "CMD52324A0020M016C006S001!YUK$")

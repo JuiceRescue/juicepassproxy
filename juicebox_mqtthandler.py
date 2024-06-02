@@ -138,6 +138,7 @@ class JuiceboxMQTTSendingEntity(JuiceboxMQTTEntity):
         if self._kwargs.get("initial_state", None) is not None:
             await self.set(self._kwargs.get("initial_state", None))
         elif self.entity_type == 'number':
+            # The state will came on juicebox messages
             _LOGGER.warning(f"{self.name} has no initial_state")
         else:
             await self.set(self.name)
@@ -161,7 +162,7 @@ class JuiceboxMQTTSendingEntity(JuiceboxMQTTEntity):
                 _LOGGER.debug(f"Sending to MITM: {state}")
                 await self._mitm_handler.send_data_to_juicebox(state.encode("utf-8"))
             else:
-                # Internal state must be set before seding message to juicebox
+                # Internal state must be set before sending message to juicebox
                 await self.set(state)
                 await self._mitm_handler.send_cmd_message_to_juicebox(new_values=True)
         else:
@@ -266,12 +267,14 @@ class JuiceboxMQTTHandler:
                 device_class="current",
                 unit_of_measurement="A",
             ),
+            # Maximum supported by device
             "current_rating": JuiceboxMQTTSensor(
                 name="Current Rating",
                 state_class="measurement",
                 device_class="current",
                 unit_of_measurement="A",
             ),
+            # Offline max 
             "current_max": JuiceboxMQTTNumber(
                 name="Max Current",
                 device_class="current",
@@ -279,6 +282,7 @@ class JuiceboxMQTTHandler:
                 min=0,
                 max=self._max_current,
             ),
+            # Instant / Charging current
             "current_max_charging": JuiceboxMQTTNumber(
                 name="Max Charging Current",
                 device_class="current",
@@ -424,10 +428,10 @@ class JuiceboxMQTTHandler:
                 )
             elif part[0] == "m":
                 message["current_rating"] = float(part.split("m")[1])
-            elif part[0] == "M":
-                message["current_max"] = float(part.split("M")[1])
             elif part[0] == "C":
-                message["current_max_charging"] = float(part.split("C")[1])
+                message["current_max"] = float(part.split("C")[1])
+            elif part[0] == "M":
+                message["current_max_charging"] = float(part.split("M")[1])
             elif part[0] == "f":
                 message["frequency"] = round(float(part.split("f")[1]) * 0.01, 2)
             elif part[0] == "L":
