@@ -244,7 +244,14 @@ class JuiceboxMITM:
 
 
     def is_mqtt_entity_defined(self, entity_name):
-        return self._mqtt_handler.get_entity(entity_name) and self._mqtt_handler.get_entity(entity_name).state
+        entity = self._mqtt_handler.get_entity(entity_name)
+
+        # TODO: not clear why sometimes "0" came at this point as string instead of numeric
+        # Using same way on HA dashboard sometimes came 0.0 float and sometimes "0" str
+        # _LOGGER.debug(f"is_mqtt_entity_defined {entity_name} {entity} {entity.state}")
+        defined = entity and (isinstance(entity.state, int | float) or (isinstance(entity.state, str) and entity.state.isnumeric()))
+
+        return defined
         
     def __build_cmd_message(self, new_values):
        
