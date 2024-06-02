@@ -39,6 +39,8 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.checksum_str, "5N5")
         self.assertEqual(m.checksum_str, m.checksum_computed())
         self.assertEqual(m.build(), raw_msg)
+        self.assertEqual(m.get_value("DOW"), "4")
+        self.assertEqual(m.get_value("HHMM"), "1325")
 
     def test_status_message_parsing(self):
         """
@@ -52,6 +54,7 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.checksum_str, m.checksum_computed())
         self.assertEqual(m.get_value("C"), "0040")
         self.assertEqual(m.get_value("v"), "09u")
+        self.assertEqual(m.get_value("serial"), "0910042001260513476122621631")
         # self.assertEqual(m.build(), raw_msg)
 
     def test_message_checksums(self):
@@ -71,9 +74,9 @@ class TestMessage(unittest.TestCase):
         for message in messages:
             if message[0:3] == "CMD":
                 m = JuiceboxCommand().from_string(message)
-                print(m.inspect())
             else:
                 m = JuiceboxMessage().from_string(message)
+            print(m.inspect())
 
             self.assertEqual(m.checksum_str, m.checksum_computed())
 

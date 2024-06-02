@@ -19,9 +19,9 @@ class JuiceboxMessage:
         pass
 
 
-    def from_string_values(self, values):
+    def parse_values(self):
         # Nothing to do here now
-        _LOGGER.info(f"No conversion on base JuiceboxMessage : {values}")
+        _LOGGER.debug(f"No values conversion on base JuiceboxMessage : {self.values}")
     
     def from_string(self, string: str) -> 'Message':
         _LOGGER.info(f"from_string {string}")
@@ -35,14 +35,17 @@ class JuiceboxMessage:
         values = {}
         while len(tmp) > 0:
             # For version there is an ending 'u' 
-            data = re.search(r'[,:]?(?P<type>[A-Za-z]+)(?P<value>[-]?[0-9]+[u]?)', tmp)
+            data = re.search(r'((?P<serial>[0-9]+):)?[,]?(?P<type>[A-Za-z]+)(?P<value>[-]?[0-9]+[u]?)', tmp)
             if data:
+                if data.group("serial"):
+                   values["serial"] = data.group("serial")
                 values[data.group("type")] = data.group("value")
                 tmp = tmp[len(data.group(0)):]
             else: 
+               _LOGGER.error(f"unable to parse value from message {tmp}")
                break
-        self.from_string_values(values)
         self.values = values
+        self.parse_values()
         self.checksum_str = msg.group('checksum')
         return self
 
@@ -73,11 +76,17 @@ class JuiceboxMessage:
 
 
     def inspect(self) -> dict:
-        return {
+        data = {
             "payload_str": self.payload_str,
             "checksum_str": self.checksum_str,
             "checksum_computed": self.checksum_computed(),
         }
+
+        # Generic base classe does not know specific fields, then put all split values
+        if self.values:
+            data.update(self.values)
+
+        return data
 
 
     def __str__(self):
@@ -105,7 +114,7 @@ class JuiceboxCommand(JuiceboxMessage):
         self.time = datetime.datetime.today()
 
     def inspect(self) -> dict:
-        return {
+        data = {
             "command": self.command,
             "offline_amperage": self.offline_amperage,
             "instant_amperage": self.instant_amperage,
@@ -114,6 +123,12 @@ class JuiceboxCommand(JuiceboxMessage):
             "checksum_str": self.checksum_str,
             "checksum_computed": self.checksum_computed(),
         }
+
+        # add any extra received value        
+        if self.values:
+            data.update(self.values)
+
+        return data
 
     def build_payload(self) -> None:
         if self.payload_str:
@@ -124,19 +139,29 @@ class JuiceboxCommand(JuiceboxMessage):
         # Original comment :
         #     Instant amperage may need to be represented using 4 digits (e.g. 0040) on newer Juicebox versions.
         # mine wich send data using version 09u works with 4 digits on offline and 3 digit on instant
+        #    sizes got from original packet dump when communicating with enel x server
         if self.new_version:
             self.payload_str = f"CMD{weekday}{self.time.strftime('%H%M')}A{self.offline_amperage:04d}M{self.instant_amperage:03d}C{self.command:03d}S{self.counter:03d}"
         else:
             self.payload_str = f"CMD{weekday}{self.time.strftime('%H%M')}A{self.offline_amperage:02d}M{self.instant_amperage:02d}C{self.command:03d}S{self.counter:03d}"
         self.checksum_str = self.checksum_computed()
 
-    def from_string_values(self, values):
-        if "C" in values:
-            self.command = int(values["C"])
-        if "A" in values:
-            self.offline_amperage = int(values["A"])
-        if "M" in values:
-            self.instant_amperage = int(values["M"])
-        if "S" in values:
-            self.counter = int(values["S"])
-        _LOGGER.info(f"from_sring values {values}")
+    def parse_values(self):
+        if "CMD" in self.values:
+            self.values["DOW"] = self.values["CMD"][0]
+            self.values["HHMM"] = self.values["CMD"][1:]
+            self.values.pop("CMD")
+        if "C" in self.values:
+            self.command = int(self.values["C"])
+            self.values.pop("C")
+        if "A" in self.values:
+            self.offline_amperage = int(self.values["A"])
+            self.values.pop("A")
+        if "M" in self.values:
+            self.instant_amperage = int(self.values["M"])
+            self.values.pop("M")
+        if "S" in self.values:
+            self.counter = int(self.values["S"])
+            self.values.pop("S")
+            
+        _LOGGER.info(f"parse_values values {self.values}")

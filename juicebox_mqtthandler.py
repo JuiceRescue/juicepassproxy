@@ -163,7 +163,7 @@ class JuiceboxMQTTSendingEntity(JuiceboxMQTTEntity):
             else:
                 # Internal state must be set before seding message to juicebox
                 await self.set(state)
-                await self._mitm_handler.send_cmd_message_to_juicebox()
+                await self._mitm_handler.send_cmd_message_to_juicebox(new_values=True)
         else:
             if self._add_error is not None:
                 await self._add_error()
