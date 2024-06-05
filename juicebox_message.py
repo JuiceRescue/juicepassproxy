@@ -9,6 +9,28 @@ import re
 
 _LOGGER = logging.getLogger(__name__)
 
+#
+# try to detect message format and use correct class for decoding
+#
+def juicebox_message_from_string(string : str):
+   if string[0:3] == "CMD":
+      return JuiceboxCommand().from_string(string)
+
+   msg = re.search(r'^(?P<id>[0-9]+):(?P<version>v[0-9]+[eu])', string)
+
+   if msg:
+      # check for encrypted message
+      #   https://github.com/snicker/juicepassproxy/issues/73
+      if msg.group('version') == 'v09e':
+         # encrypted version
+         raise JuiceboxInvalidMessageFormat(f"Unable to parse encrypted message: '{string}'")
+
+      return JuiceboxMessage().from_string(string)
+
+   raise JuiceboxInvalidMessageFormat(f"Unable to parse message: '{string}'")
+      
+      
+      
 class JuiceboxMessage:
 
     def __init__(self) -> None:
