@@ -28,23 +28,30 @@ _Hopefully we won't need this if EnelX fixes their API!_
     A. Configure your DNS server running on your network (like Pi-hole or your router) to route all UDP traffic from your JuiceBox to the machine running this proxy. Instructions for how to do this will vary by router. See [Getting EnelX Server IPs](#getting-enelx-server-ips) for instructions on what EnelX Server you need to override.
 
     B. Set these Docker Environment Variables in your Docker Compose file:</br>
+
       ```
       UPDATE_UDPC=true
       JUICEBOX_HOST=<IP address of your JuiceBox>
       JPP_HOST=<IP address of the machine that the JuicePass Proxy Docker Container is running on>
       ```
 
-    C. Use your router to redirect traffic from juicebox to juicepassproxy
-      - check the port that your juicebox is using to communicate. See [Getting EnelX Server IPs](#getting-enelx-server-ips)
-      - create a redirect rule on your router redirect udp traffic comming from juicebox to the IP:PORT where you will be running your juicepassproxy
-      - create a masquerade rule on router to masquerade the traffic that goes to juicepassproxy IP:PORT (hairpin nat)
-      - depending of your forward rules, maybe you need to create an extra rule to allow that forwarding traffic
-      - sample mikrotik rules for reference (10.1.12.230 = juicebox, 10.1.0.22 = juicepassproxy)
-        ```
-        add action=dst-nat chain=dstnat comment=juicebox dst-port=8042 protocol=udp src-address=10.1.12.230 to-addresses=10.1.0.22 to-ports=8042
-        #
-        add action=masquerade chain=srcnat comment=juicebox dst-address=10.1.0.22 dst-port=8042 protocol=udp src-address=10.1.12.230
-        ```
+    C. Use your router to redirect traffic from JuiceBox to JuicePass Proxy
+
+      *  Check the port that your JuiceBox is using to communicate. See [Getting EnelX Server IPs](#getting-enelx-server-ips)
+
+      *  Create a redirect rule on your router redirect UDP traffic coming from JuiceBox to the IP:PORT where you are running JuicePass Proxy
+
+      *  Create a masquerade rule on router to masquerade the traffic that goes to JuicePass Proxy IP:PORT (hairpin nat)
+
+      *  Depending of your forward rules, you may need to create an extra rule to allow that forwarding traffic
+
+      *  Sample MikroTik rules for reference (10.1.12.230 = JuiceBox, 10.1.0.22 = JuicePass Proxy)</br>
+
+      ```
+      add action=dst-nat chain=dstnat comment=juicebox dst-port=8042 protocol=udp src-address=10.1.12.230 to-addresses=10.1.0.22 to-ports=8042
+      #
+      add action=masquerade chain=srcnat comment=juicebox dst-address=10.1.0.22 dst-port=8042 protocol=udp src-address=10.1.12.230
+      ```
 
 1. Add the `juicepassproxy` container to your Docker Compose file.
 
