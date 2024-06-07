@@ -34,6 +34,18 @@ _Hopefully we won't need this if EnelX fixes their API!_
       JPP_HOST=<IP address of the machine that the JuicePass Proxy Docker Container is running on>
       ```
 
+    C. Use your router to redirect traffic from juicebox to juicepassproxy
+      - check the port that your juicebox is using to communicate. See [Getting EnelX Server IPs](#getting-enelx-server-ips)
+      - create a redirect rule on your router redirect udp traffic comming from juicebox to the IP:PORT where you will be running your juicepassproxy
+      - create a masquerade rule on router to masquerade the traffic that goes to juicepassproxy IP:PORT (hairpin nat)
+      - depending of your forward rules, maybe you need to create an extra rule to allow that forwarding traffic
+      - sample mikrotik rules for reference (10.1.12.230 = juicebox, 10.1.0.22 = juicepassproxy)
+        ```
+        add action=dst-nat chain=dstnat comment=juicebox dst-port=8042 protocol=udp src-address=10.1.12.230 to-addresses=10.1.0.22 to-ports=8042
+        #
+        add action=masquerade chain=srcnat comment=juicebox dst-address=10.1.0.22 dst-port=8042 protocol=udp src-address=10.1.12.230
+        ```
+
 1. Add the `juicepassproxy` container to your Docker Compose file.
 
     A.  Set `ports:` to the port listed in the UDCP line, likely `8047` _(see [Getting EnelX Server IPs](#getting-enelx-server-ips))_.
