@@ -1,6 +1,7 @@
 import unittest
-from juicebox_message import juicebox_message_from_string,JuiceboxMessage, JuiceboxCommand
+from juicebox_message import juicebox_message_from_string, juicebox_message_from_bytes, JuiceboxMessage, JuiceboxEncryptedMessage, JuiceboxCommand
 from juicebox_exceptions import JuiceboxInvalidMessageFormat
+import codecs
 import datetime
 
 class TestMessage(unittest.TestCase):
@@ -9,9 +10,8 @@ class TestMessage(unittest.TestCase):
         m.time = datetime.datetime(2012, 3, 23, 23, 24, 55, 173504)
         m.offline_amperage = 16
         m.instant_amperage = 20
-        print(m.build())
-        print(m.inspect())
         self.assertEqual(m.build(), "CMD52324A20M16C006S001!5RE$")
+        print(m.inspect())
 
 
     def test_message_building_new(self):
@@ -19,14 +19,30 @@ class TestMessage(unittest.TestCase):
         m.time = datetime.datetime(2012, 3, 23, 23, 24, 55, 173504)
         m.offline_amperage = 16
         m.instant_amperage = 20
-        print(m.build())
-        print(m.inspect())
         self.assertEqual(m.build(), "CMD52324A0020M016C006S001!YUK$")
+        print(m.inspect())
 
 
+    def test_entrypted_message(self):
+        messages = [
+            # https://github.com/snicker/juicepassproxy/issues/73#issuecomment-2149670058
+            "303931303034323030313238303636303432373332333632303533353a7630396512b10a000000716b1493270404a809cbcbb7995fd86b391e4b5e606fd5153a81ecd6251eb2bf87da82db9ceaefb268caa8f0c01b538af48e45d1ef3ad28ca72a4fdf05261780fd753b361906368634821bf6cada5624bae11feb7dc975cfe14e2c305eb01adcc7b39687ddc130d66cc39bc2ccac7f903cb9b50adb9a77b95b77bd364b82dcbe8599dc9a8a880cc44eb0f04e8a1d9f4a6305978a7f3e3c58d5"
+            "303931303034323030313238303636303432373332333632303533353a7630396512b10a00000073480d38833df8ebed8add322332c5c9f0501b32e9b35b71d1d8d3e389f5b9002b42ee953b5d9f712ddd36ebcb9f0a8973eba739f388583429d3fcd4cd135f9e4d437ad6ad21c11ad8e89369252ada194b52436beeb67a15b4a24f85eae07ebeeb6270588c94e390fa6da00c831e290a8552bd49ce014db1aa70843ebb5db2b0dea0fa20d0ed00714ae3001c895bf54779d5d1449ee15bf486"
+            # TODO try to find a message that maybe can be decoded as string if possible
+        ]
+        for message in messages:
+            print("enc")
+            m = juicebox_message_from_bytes(codecs.decode(message,'hex'))
+            self.assertEqual(JuiceboxEncryptedMessage, type(m))
+    
     def test_message_validation(self):
-        with self.assertRaises(JuiceboxInvalidMessageFormat):
-            m = juicebox_message_from_string("g4rbl3d")
+        messages = [
+            "g4rbl3d",
+        ]
+        for message in messages:
+            with self.assertRaises(JuiceboxInvalidMessageFormat):
+                print(f"bad : {message}")
+                m = juicebox_message_from_string(message)
 
 
     def test_command_message_parsing(self):
@@ -39,6 +55,7 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.checksum_str, "5N5")
         self.assertEqual(m.checksum_str, m.checksum_computed())
         self.assertEqual(m.build(), raw_msg)
+
         self.assertEqual(m.get_value("DOW"), "4")
         self.assertEqual(m.get_value("HHMM"), "1325")
 
@@ -54,8 +71,9 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.checksum_str, m.checksum_computed())
         self.assertEqual(m.get_value("C"), "0040")
         self.assertEqual(m.get_value("v"), "09u")
+        self.assertEqual(m.get_value("V"), "2414")
         self.assertEqual(m.get_value("serial"), "0910042001260513476122621631")
-        # self.assertEqual(m.build(), raw_msg)
+        self.assertEqual(m.build(), raw_msg)
 
     def test_message_checksums(self):
         messages = [
@@ -73,8 +91,9 @@ class TestMessage(unittest.TestCase):
 
         for message in messages:
             m = juicebox_message_from_string(message)
-            print(m.inspect())
+#            print(m.inspect())
 
+            self.assertEqual(m.build(), message)
             self.assertEqual(m.checksum_str, m.checksum_computed())
 
 if __name__ == '__main__':

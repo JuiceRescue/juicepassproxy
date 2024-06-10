@@ -10,20 +10,33 @@ import re
 _LOGGER = logging.getLogger(__name__)
 
 #
-# try to detect message format and use correct class for decoding
+# try to detect message format and use correct decoding process
 #
+def juicebox_message_from_bytes(data : bytes):
+   ## TODO: try to detect here if message is encrypted or not
+   # Currently all non encrypted messages that we have capture can be converted to string
+   try:
+       string = data.decode("utf-8")
+       return juicebox_message_from_string(string)
+   except UnicodeDecodeError as e:
+       # Probably is a encrypted messsage
+       return JuiceboxEncryptedMessage().from_bytes(data)
+   
+   
+# ID:version   
+BASE_MESSAGE_PATTERN = r'^(?P<serial>[0-9]+):(?P<version>v[0-9]+[eu])'
+   
 def juicebox_message_from_string(string : str):
    if string[0:3] == "CMD":
       return JuiceboxCommand().from_string(string)
 
-   msg = re.search(r'^(?P<id>[0-9]+):(?P<version>v[0-9]+[eu])', string)
-
+   msg = re.search(BASE_MESSAGE_PATTERN, string)
+      
    if msg:
       # check for encrypted message
       #   https://github.com/snicker/juicepassproxy/issues/73
       if msg.group('version') == 'v09e':
-         # encrypted version
-         raise JuiceboxInvalidMessageFormat(f"Unable to parse encrypted message: '{string}'")
+         return JuiceboxEncryptedMessage(str.encode(string))
 
       return JuiceboxMessage().from_string(string)
 
@@ -37,6 +50,7 @@ class JuiceboxMessage:
         self.payload_str = None
         self.checksum_str = None
         self.values = None
+        self.end_char = ':'
 
         pass
 
@@ -89,12 +103,12 @@ class JuiceboxMessage:
         if self.payload_str:
             return
 
-        _LOGGER.error("this base class cannot built payload")
+        _LOGGER.error("this base class cannot build payload")
 
 
     def build(self) -> str:
         self.build_payload()
-        return f"{(self.payload_str)}!{self.checksum_str}$"
+        return f"{(self.payload_str)}!{self.checksum_str}{self.end_char}"
 
 
     def inspect(self) -> dict:
@@ -104,7 +118,7 @@ class JuiceboxMessage:
             "checksum_computed": self.checksum_computed(),
         }
 
-        # Generic base classe does not know specific fields, then put all split values
+        # Generic base class does not know specific fields, then put all split values
         if self.values:
             data.update(self.values)
 
@@ -114,12 +128,33 @@ class JuiceboxMessage:
     def __str__(self):
         return self.build()
 
+class JuiceboxEncryptedMessage(JuiceboxMessage):
+
+    
+    def from_bytes(self, data : bytes):
+       # get only serial and version 
+       string = data[0:33].decode("utf-8")
+       msg = re.search(BASE_MESSAGE_PATTERN, string)
+      
+       if msg:
+           if msg.group("version") == "v09e":
+               _LOGGER.warning(f"TODO: encrypted {data}")
+               # TODO
+               return self
+           else:
+             raise JuiceboxInvalidMessageFormat(f"Unsupported encrypted message version: '{data}'")
+           
+       else:
+           raise JuiceboxInvalidMessageFormat(f"Unsupported message format: '{data}'")
+        
+
 class JuiceboxCommand(JuiceboxMessage):
 
     def __init__(self, previous=None, new_version=False) -> None:
         super().__init__()
         self.new_version = new_version
         self.command = 6 # Alternates between C242, C244, C008, C006. Meaning unclear.
+        self.end_char = "$"
 
         # increments by one for every message until 999 then it loops back to 1
         if previous:
