@@ -25,6 +25,7 @@ def juicebox_message_from_bytes(data : bytes):
    
 # ID:version   
 BASE_MESSAGE_PATTERN = r'^(?P<serial>[0-9]+):(?P<version>v[0-9]+[eu])'
+BASE_MESSAGE_PATTERN_NO_VERSION = r'^(?P<serial>[0-9]+):'
    
 def juicebox_message_from_string(string : str):
    if string[0:3] == "CMD":
@@ -40,13 +41,18 @@ def juicebox_message_from_string(string : str):
 
       return JuiceboxMessage().from_string(string)
 
+   msg = re.search(BASE_MESSAGE_PATTERN_NO_VERSION, string)
+   if msg:
+      return JuiceboxMessage(False).from_string(string)
+      
    raise JuiceboxInvalidMessageFormat(f"Unable to parse message: '{string}'")
       
       
       
 class JuiceboxMessage:
 
-    def __init__(self) -> None:
+    def __init__(self, has_checksum=True) -> None:
+        self.has_checksum = has_checksum
         self.payload_str = None
         self.checksum_str = None
         self.values = None
@@ -61,34 +67,48 @@ class JuiceboxMessage:
     
     def from_string(self, string: str) -> 'Message':
         _LOGGER.info(f"from_string {string}")
-        msg = re.search(r'((?P<payload>.*)!(?P<checksum>[A-Z0-9]{3})(?:\$|:))', string)
+        msg = re.search(r'((?P<payload>[^!]*)(!(?P<checksum>[A-Z0-9]{3}))?(?:\$|:))', string)
 
         if msg is None:
             raise JuiceboxInvalidMessageFormat(f"Unable to parse message: '{string}'")
 
         self.payload_str = msg.group('payload')
+        self.checksum_str = msg.group('checksum')
+
+        if not self.has_checksum and self.checksum_str:
+            raise JuiceboxInvalidMessageFormat(f"Found checksum in message that are supposed to dont have checksum '{string}'")
+
+        if self.has_checksum and not self.checksum_str:
+            raise JuiceboxInvalidMessageFormat(f"Checksum not found in message that are supposed to have checksum '{string}'")
+
+        values = {}        
         tmp = self.payload_str
-        values = {}
         while len(tmp) > 0:
-            # For version there is an ending 'u' 
+            # For version there is an ending 'u' for this unencrypted messages, the 'e' encrypted messages are not supported here
+            # all other values are nummeric
+            # Serial appear only on messages that came from juicebox device 
             data = re.search(r'((?P<serial>[0-9]+):)?[,]?(?P<type>[A-Za-z]+)(?P<value>[-]?[0-9]+[u]?)', tmp)
             if data:
                 if data.group("serial"):
-                   values["serial"] = data.group("serial")
+                   values["serial"] = data.group("serial")            
                 values[data.group("type")] = data.group("value")
                 tmp = tmp[len(data.group(0)):]
             else: 
                _LOGGER.error(f"unable to parse value from message {tmp}")
                break
+
         self.values = values
         self.parse_values()
-        self.checksum_str = msg.group('checksum')
+
         return self
 
-
+    def has_value(self, type):
+        return type in self.values
+        
     def get_value(self, type):
-        if type in self.values:
+        if self.has_value(type):
            return self.values[type]
+           
         return None
         
     def checksum(self) -> JuiceboxChecksum:
@@ -96,7 +116,10 @@ class JuiceboxMessage:
 
 
     def checksum_computed(self) -> str:
-        return self.checksum().base35()
+        if self.has_checksum:
+            return self.checksum().base35()
+        else:
+            return None
 
 
     def build_payload(self) -> None:
@@ -108,15 +131,21 @@ class JuiceboxMessage:
 
     def build(self) -> str:
         self.build_payload()
-        return f"{(self.payload_str)}!{self.checksum_str}{self.end_char}"
+        if self.has_checksum:
+            return f"{(self.payload_str)}!{self.checksum_str}{self.end_char}"
+        else:
+            return f"{(self.payload_str)}{self.end_char}"
 
 
     def inspect(self) -> dict:
         data = {
             "payload_str": self.payload_str,
+        }
+        if self.has_checksum:
+           data.update({
             "checksum_str": self.checksum_str,
             "checksum_computed": self.checksum_computed(),
-        }
+           })
 
         # Generic base class does not know specific fields, then put all split values
         if self.values:
@@ -127,6 +156,8 @@ class JuiceboxMessage:
 
     def __str__(self):
         return self.build()
+
+
 
 class JuiceboxEncryptedMessage(JuiceboxMessage):
 

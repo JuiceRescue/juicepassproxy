@@ -101,7 +101,7 @@ class JuiceboxMQTTEntity:
             if self._add_error is not None:
                 await self._add_error()
             _LOGGER.warning(
-                f"Can't update attribtutes for {self.name} "
+                f"Can't update attributes for {self.name} "
                 "as MQTT isn't connected/started. "
                 f"({e.__class__.__qualname__}: {e})"
             )
@@ -389,8 +389,11 @@ class JuiceboxMQTTHandler:
                 entity.add_kwargs(mitm_handler=mitm_handler)
 
     async def _basic_message_parse(self, data: bytes):
+        # TODO change to receive a JuiceboxMessage which is already parsed
+
         message = {"type": "basic", "current": 0, "energy_session": 0}
         active = True
+        
         parts = re.split(r",|!|:", data.decode("utf-8"))
         parts.pop(0)  # JuiceBox ID
         parts.pop(-1)  # Ending blank
@@ -451,7 +454,11 @@ class JuiceboxMQTTHandler:
             elif part[0] == "T":
                 message["temperature"] = round(float(part.split("T")[1]) * 1.8 + 32, 2)
             elif part[0] == "V":
-                message["voltage"] = round(float(part.split("V")[1]) * 0.1, 2)
+                # Device that does not send protocol_version dont send decimal value for Voltage
+                if message["protocol_version"]:
+                    message["voltage"] = round(float(part.split("V")[1]) * 0.1, 2)
+                else:
+                    message["voltage"] = round(float(part.split("V")[1]), 2)
             else:
                 message["unknown_" + part[0]] = part[1:]
         message["power"] = round(
