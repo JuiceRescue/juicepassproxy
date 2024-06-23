@@ -11,7 +11,7 @@ class TestMessage(unittest.TestCase):
         m.offline_amperage = 16
         m.instant_amperage = 20
         self.assertEqual(m.build(), "CMD52324A20M16C006S001!5RE$")
-        print(m.inspect())
+#        print(m.inspect())
 
 
     def test_message_building_new(self):
@@ -20,7 +20,7 @@ class TestMessage(unittest.TestCase):
         m.offline_amperage = 16
         m.instant_amperage = 20
         self.assertEqual(m.build(), "CMD52324A0020M016C006S001!YUK$")
-        print(m.inspect())
+#        print(m.inspect())
 
 
     def test_entrypted_message(self):
@@ -59,6 +59,8 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_value("DOW"), "4")
         self.assertEqual(m.get_value("HHMM"), "1325")
 
+
+
     def test_status_message_parsing(self):
         """
         Status messages are sent by the Juicebox
@@ -73,10 +75,52 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_value("C"), "0040")
         self.assertEqual(m.get_value("v"), "09u")
         self.assertEqual(m.get_value("V"), "2414")
+        self.assertEqual(m.get_value("voltage"), "2414")
+        self.assertEqual(m.get_processed_value("status"), "Plugged In")
+        self.assertEqual(m.get_processed_value("voltage"), 241.4)
         self.assertEqual(m.get_value("serial"), "0910042001260513476122621631")
         self.assertEqual(True, m.has_value("L"))
         self.assertEqual(True, m.has_value("M"))
         self.assertEqual(m.build(), raw_msg)
+
+    # https://github.com/snicker/juicepassproxy/issues/80
+    OLD_MESSAGE = '081107211258014850420158808:V247,L11097,S0,T34,E14,i84,e1,t30:'
+    OLD_CHARGING = '081107211258014850420158808:V247,L11097,E60,A137,T20,t10,E14,i94,e2:'
+    OLD_PLUGGED_IN = '081107211258014850420158808:V247,L11097,E67,A0,T20,t10,E14,i49,e1:'
+
+
+    def test_old_message(self):
+        """
+        Test old  message
+        """
+
+        m = juicebox_message_from_string(self.OLD_MESSAGE)
+        self.assertEqual(m.payload_str, self.OLD_MESSAGE[:-1])
+        self.assertEqual(m.checksum_str, None)
+        self.assertEqual(m.get_processed_value("status"), "Unplugged")
+        self.assertEqual(m.get_processed_value("voltage"), 247)
+
+    def test_old_charging(self):
+        """
+        Test old charging message
+        """
+
+        m = juicebox_message_from_string(self.OLD_CHARGING)
+        self.assertEqual(m.payload_str, self.OLD_CHARGING[:-1])
+        self.assertEqual(m.checksum_str, None)
+        self.assertEqual(m.get_processed_value("status"), "Charging")
+        self.assertEqual(m.get_processed_value("voltage"), 247)
+
+    def test_old_pluggedin(self):
+        """
+        Test old PluggedIn message
+        """
+
+        m = juicebox_message_from_string(self.OLD_PLUGGED_IN)
+        self.assertEqual(m.payload_str, self.OLD_PLUGGED_IN[:-1])
+        self.assertEqual(m.checksum_str, None)
+        self.assertEqual(m.get_processed_value("status"), "Plugged In")
+        self.assertEqual(m.get_processed_value("voltage"), 247)
 
     def test_message_checksums(self):
         cmd_messages = [
@@ -93,23 +137,27 @@ class TestMessage(unittest.TestCase):
             # Original message changed to remove real serial number
             '0910000000000000000000000000:v09u,s001,F31,u00412974,V1366,L00004262804,S02,T28,M0024,C0024,m0032,t09,i23,e-0001,f5990,r99,b000,B0000000,P0,E0004501,A00161,p0996!ZW5:',
         ]
-        messages = [
-            # https://github.com/snicker/juicepassproxy/issues/80
-            '081107211258014850420158808:V247,L11097,S0,T34,E14,i84,e1,t30:'
+        old_messages = [
+            self.OLD_MESSAGE,
+            self.OLD_PLUGGED_IN,
+            self.OLD_CHARGING
         ]
 
-        for message in (cmd_messages + checksum_messages + messages):
+        for message in (cmd_messages + checksum_messages + old_messages):
             m = juicebox_message_from_string(message)
 
             self.assertEqual(m.build(), message)
             self.assertEqual(m.checksum_str, m.checksum_computed())
+#            print(m.inspect())
 
 
         for message in checksum_messages:
+            # expect for error when trying to parse a checksum message ignoring checksum
             with self.assertRaises(JuiceboxInvalidMessageFormat):
                 m = JuiceboxMessage(False).from_string(message)
 
-        for message in messages:
+        for message in old_messages:
+            # expect for error when trying to parse old message without checking considering checksum
             with self.assertRaises(JuiceboxInvalidMessageFormat):
                 m = JuiceboxMessage().from_string(message)
 

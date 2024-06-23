@@ -9,6 +9,68 @@ import re
 
 _LOGGER = logging.getLogger(__name__)
 
+
+STATUS_DEFS = { 
+    "0": "Unplugged",
+    "1": "Plugged In",
+    "2": "Charging",
+    "5": "Error",
+    "00": "Unplugged",
+    "01": "Plugged In",
+    "02": "Charging",
+    "05": "Error",
+    }
+  
+def process_status(message, value):
+    if value in STATUS_DEFS:
+       return STATUS_DEFS[value]
+    if (value is None) and message.has_value('current'):
+       # Old Protocol does not send status in all messages
+       # try to detect state based on current
+       current = int(message.get_value("current"))
+       if current == 0:
+          return "Plugged In"
+          
+       if current > 0:
+          return "Charging"
+
+    return f"unknown {value}"
+    
+def process_voltage(message, value):
+    # Older messages came with less digits
+    if len(value) < 4:
+        return float(value)
+
+    return float(value) * 0.1
+    
+
+FROM_JUICEBOX_FIELD_DEFS = {
+    # Undefined parts: F, e, r, b, B, P, p
+    # https://github.com/snicker/juicepassproxy/issues/52
+    "A" : { "alias" : "current" },
+    "C" : { "alias" : "current_max" },
+    "E" : { "alias" : "energy_session" },
+    "f" : { "alias" : "frequency" },
+    # i = Interval number. It contains a 96-slot interval memory (15-minute x 24-hour cycle) and
+    #   this tells you how much energy was consumed in the rolling window as it reports one past
+    #   (or current, if it's reporting the "right-now" interval) interval per message.
+    #   The letter after "i" = the energy in that interval (usually 0 if you're not charging basically 24/7)
+    "i" : { "alias" : "interval" },
+    "m" : { "alias" : "current_rating" },
+    "M" : { "alias" : "current_max_charging" },
+    "L" : { "alias" : "energy_lifetime" },
+    "s" : { "alias" : "counter" },
+    "S" : { "alias" : "status", "process" : process_status },
+    # t - probably the report time in seconds - "every 9 seconds" (or may end up being 10).
+    #   It can change its reporting interval if the bit mask in the reply command indicates that it should send reports faster (yet to be determined).
+    "t" : { "alias" : "report_time" },
+    "T" : { "alias" : "temperature" },
+    "u" : { "alias" : "loop_counter" },
+    "v" : { "alias" : "protocol_version" },
+    "V" : { "alias" : "voltage", "process" : process_voltage },
+    }
+
+
 #
 # try to detect message format and use correct decoding process
 #
@@ -51,12 +113,17 @@ def juicebox_message_from_string(string : str):
       
 class JuiceboxMessage:
 
-    def __init__(self, has_checksum=True) -> None:
+    def __init__(self, has_checksum=True, defs=FROM_JUICEBOX_FIELD_DEFS) -> None:
         self.has_checksum = has_checksum
         self.payload_str = None
         self.checksum_str = None
         self.values = None
         self.end_char = ':'
+        self.defs = defs        
+        self.aliases = {}
+        # to make easier to use get_values
+        for k in self.defs:
+           self.aliases[self.defs[k]["alias"]] = k
 
         pass
 
@@ -103,13 +170,29 @@ class JuiceboxMessage:
         return self
 
     def has_value(self, type):
-        return type in self.values
+        if type in self.aliases:
+            return self.aliases[type] in self.values
+        else:
+            return type in self.values
         
     def get_value(self, type):
+           
         if self.has_value(type):
-           return self.values[type]
+           if type in self.aliases:
+               return self.values[self.aliases[type]]
+           else:
+               return self.values[type]
            
         return None
+        
+    def get_processed_value(self, type):
+        if type in self.aliases:
+           return self.get_processed_value(self.aliases[type])
+           
+        if "process" in self.defs[type]:
+            return self.defs[type]["process"](self, self.get_value(type))
+
+        return self.get_value(type)
         
     def checksum(self) -> JuiceboxChecksum:
         return JuiceboxChecksum(self.payload_str)
@@ -149,7 +232,11 @@ class JuiceboxMessage:
 
         # Generic base class does not know specific fields, then put all split values
         if self.values:
-            data.update(self.values)
+            for k in self.values:
+               if k in self.defs:
+                  data[self.defs[k]["alias"]] = self.values[k]
+               else:
+                  data[k] = self.values[k]
 
         return data
 
@@ -182,7 +269,7 @@ class JuiceboxEncryptedMessage(JuiceboxMessage):
 class JuiceboxCommand(JuiceboxMessage):
 
     def __init__(self, previous=None, new_version=False) -> None:
-        super().__init__()
+        super().__init__(defs={})
         self.new_version = new_version
         self.command = 6 # Alternates between C242, C244, C008, C006. Meaning unclear.
         self.end_char = "$"

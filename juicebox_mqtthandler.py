@@ -399,17 +399,6 @@ class JuiceboxMQTTHandler:
         parts.pop(-1)  # Ending blank
         parts.pop(-1)  # Checksum
 
-        # Undefined parts: F, e, r, b, B, P, p
-        # https://github.com/snicker/juicepassproxy/issues/52
-        # s = Counter
-        # v = version of protocol
-        # i = Interval number. It contains a 96-slot interval memory (15-minute x 24-hour cycle) and
-        #   this tells you how much energy was consumed in the rolling window as it reports one past
-        #   (or current, if it's reporting the "right-now" interval) interval per message.
-        #   The letter after "i" = the energy in that interval (usually 0 if you're not charging basically 24/7)
-        # t - probably the report time in seconds - "every 9 seconds" (or may end up being 10).
-        #   It can change its reporting interval if the bit mask in the reply command indicates that it should send reports faster (yet to be determined).
-        # u - loop counter
         for part in parts:
             if part[0] == "S":
                 message["status"] = {
