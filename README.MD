@@ -191,6 +191,7 @@ As of November, 2023: `juicenet-udp-prod3-usa.enelx.com` = `54.161.185.130`.
 
 - **Max Current**
    - The maximum current that device will charge when offline (not connected to juicebox or Enel X)
+      - 2024-06 tested on device which send protocol v09u it changes **Max Charging Current** to this value around 5 minutes after not receiving messages from proxy
    - Stored on EEPROM - https://github.com/snicker/juicepassproxy/issues/39#issuecomment-2002312548
       - Because of this **don't change that value many times**, as any EEPROM has a lifespan based on writes and the *Max Charging Current* will make possible to control the Current for Charging
 - **Max Charging Current**

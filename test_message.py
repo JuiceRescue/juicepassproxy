@@ -83,10 +83,13 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(True, m.has_value("M"))
         self.assertEqual(m.build(), raw_msg)
 
+    FAKE_SERIAL = "0910000000000000000000000000"
     # https://github.com/snicker/juicepassproxy/issues/80
-    OLD_MESSAGE = '081107211258014850420158808:V247,L11097,S0,T34,E14,i84,e1,t30:'
-    OLD_CHARGING = '081107211258014850420158808:V247,L11097,E60,A137,T20,t10,E14,i94,e2:'
-    OLD_PLUGGED_IN = '081107211258014850420158808:V247,L11097,E67,A0,T20,t10,E14,i49,e1:'
+    # real serial removed as not used by any check
+    OLD_MESSAGE = '0910000000000000000000000000:V247,L11097,S0,T34,E14,i84,e1,t30:'
+    OLD_MESSAGE_2 = '0910000000000000000000000000:V247,L11156,E13322,A138,T28,t10,E14,i41,e1:'
+    OLD_CHARGING = '0910000000000000000000000000:V247,L11097,E60,A137,T20,t10,E14,i94,e2:'
+    OLD_PLUGGED_IN = '0910000000000000000000000000:V247,L11097,E67,A0,T20,t10,E14,i49,e1:'
 
 
     def test_old_message(self):
@@ -97,8 +100,24 @@ class TestMessage(unittest.TestCase):
         m = juicebox_message_from_string(self.OLD_MESSAGE)
         self.assertEqual(m.payload_str, self.OLD_MESSAGE[:-1])
         self.assertEqual(m.checksum_str, None)
+        self.assertEqual(m.get_value("serial"), self.FAKE_SERIAL)
         self.assertEqual(m.get_processed_value("status"), "Unplugged")
         self.assertEqual(m.get_processed_value("voltage"), 247)
+
+    def test_old_message_2(self):
+        """
+        Test old  message
+        """
+
+        m = juicebox_message_from_string(self.OLD_MESSAGE_2)
+        self.assertEqual(m.payload_str, self.OLD_MESSAGE_2[:-1])
+        self.assertEqual(m.checksum_str, None)
+        self.assertEqual(m.get_value("serial"), self.FAKE_SERIAL)
+        self.assertEqual(m.get_processed_value("status"), "Charging")
+        # the duplicate value is saved but what they mean ???
+        self.assertEqual(m.get_value("E"), "13322")
+        self.assertEqual(m.get_value("E:1"), "14")
+        self.assertEqual(m.get_value("A"), "138")
 
     def test_old_charging(self):
         """
@@ -108,8 +127,12 @@ class TestMessage(unittest.TestCase):
         m = juicebox_message_from_string(self.OLD_CHARGING)
         self.assertEqual(m.payload_str, self.OLD_CHARGING[:-1])
         self.assertEqual(m.checksum_str, None)
+        self.assertEqual(m.get_value("serial"), self.FAKE_SERIAL)
         self.assertEqual(m.get_processed_value("status"), "Charging")
         self.assertEqual(m.get_processed_value("voltage"), 247)
+        # the duplicate value is saved but what they mean ???
+        self.assertEqual(m.get_value("E"), "60")
+        self.assertEqual(m.get_value("E:1"), "14")
 
     def test_old_pluggedin(self):
         """
@@ -119,8 +142,12 @@ class TestMessage(unittest.TestCase):
         m = juicebox_message_from_string(self.OLD_PLUGGED_IN)
         self.assertEqual(m.payload_str, self.OLD_PLUGGED_IN[:-1])
         self.assertEqual(m.checksum_str, None)
+        self.assertEqual(m.get_value("serial"), self.FAKE_SERIAL)
         self.assertEqual(m.get_processed_value("status"), "Plugged In")
         self.assertEqual(m.get_processed_value("voltage"), 247)
+        # the duplicate value is saved but what they mean ???
+        self.assertEqual(m.get_value("E"), "67")
+        self.assertEqual(m.get_value("E:1"), "14")
 
     def test_message_checksums(self):
         cmd_messages = [
@@ -139,6 +166,7 @@ class TestMessage(unittest.TestCase):
         ]
         old_messages = [
             self.OLD_MESSAGE,
+            self.OLD_MESSAGE_2,
             self.OLD_PLUGGED_IN,
             self.OLD_CHARGING
         ]

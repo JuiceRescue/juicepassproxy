@@ -12,7 +12,7 @@ from const import (
     MITM_RECV_TIMEOUT,
     MITM_SEND_DATA_TIMEOUT,
 )
-from juicebox_message import JuiceboxCommand, juicebox_message_from_bytes
+from juicebox_message import JuiceboxCommand, JuiceboxEncryptedMessage, juicebox_message_from_bytes
 
 # Began with https://github.com/rsc-dev/pyproxy and rewrote when moving to async.
 
@@ -243,7 +243,7 @@ class JuiceboxMITM:
         await self.send_data(data, self._juicebox_addr)
 
 
-    def is_mqtt_entity_defined(self, entity_name):
+    def is_mqtt_numeric_entity_defined(self, entity_name):
         entity = self._mqtt_handler.get_entity(entity_name)
 
         # TODO: not clear why sometimes "0" came at this point as string instead of numeric
@@ -255,6 +255,10 @@ class JuiceboxMITM:
         
     def __build_cmd_message(self, new_values):
        
+       if type(self._last_message) is JuiceboxEncryptedMessage:
+          _LOGGER.info("Responses for encrypted protocol not supported yet")
+          return None
+          
        # TODO: check which other versions can be considered as new_version of protocol
        new_version = self._last_message and (self._last_message.get_value("v") == "09u")
        if self._last_command:
@@ -275,12 +279,17 @@ class JuiceboxMITM:
 
     # Send a new message using values on mqtt entities
     async def send_cmd_message_to_juicebox(self, new_values):
-       if self.is_mqtt_entity_defined("current_max") and self.is_mqtt_entity_defined("current_max_charging"):
-          cmd_message = self.__build_cmd_message(new_values)
-          _LOGGER.info(f"Sending command to juicebox {cmd_message} new_values={new_values}")
-          await self.send_data(cmd_message.encode('utf-8'), self._juicebox_addr)
-       else:
-          _LOGGER.warn("Unable to send command to juicebox before current_max and current_max_charging values are set") 
+       
+       if self._mqtt_handler.get_entity("act_as_server").is_on():
+
+          # Max current values must be define to send messages to device
+          if self.is_mqtt_numeric_entity_defined("current_max") and self.is_mqtt_numeric_entity_defined("current_max_charging"):
+              cmd_message = self.__build_cmd_message(new_values)
+              if cmd_message:
+                  _LOGGER.info(f"Sending command to juicebox {cmd_message} new_values={new_values}")
+                  await self.send_data(cmd_message.encode('utf-8'), self._juicebox_addr)
+          else:
+              _LOGGER.warn("Unable to send command to juicebox before current_max and current_max_charging values are set") 
 
     async def set_mqtt_handler(self, mqtt_handler):
         self._mqtt_handler = mqtt_handler

@@ -9,30 +9,38 @@ import re
 
 _LOGGER = logging.getLogger(__name__)
 
+STATUS_CHARGING = "Charging"
+STATUS_ERROR = "Error"
+STATUS_PLUGGED_IN = "Plugged In"
+STATUS_UNPLUGGED = "Unplugged"
+
 
 STATUS_DEFS = { 
-    "0": "Unplugged",
-    "1": "Plugged In",
-    "2": "Charging",
-    "5": "Error",
-    "00": "Unplugged",
-    "01": "Plugged In",
-    "02": "Charging",
-    "05": "Error",
+    0: STATUS_UNPLUGGED,
+    1: STATUS_PLUGGED_IN,
+    2: STATUS_CHARGING,
+    5: STATUS_ERROR
     }
+
+
+FIELD_SERIAL = "serial"
+FIELD_CURRENT = "current"
+
   
 def process_status(message, value):
-    if value in STATUS_DEFS:
-       return STATUS_DEFS[value]
-    if (value is None) and message.has_value('current'):
-       # Old Protocol does not send status in all messages
-       # try to detect state based on current
-       current = int(message.get_value("current"))
+    if value and value.isnumeric() and (int(value) in STATUS_DEFS):
+       return STATUS_DEFS[int(value)]
+    
+    # Old Protocol does not send status in all messages
+    # try to detect state based on current
+    if (value is None) and message.has_value(FIELD_CURRENT) and message.get_value(FIELD_CURRENT).isnumeric():
+       current = int(message.get_value(FIELD_CURRENT))
+       # must test more to know if they send messages like this when Unplugged
        if current == 0:
-          return "Plugged In"
+          return STATUS_PLUGGED_IN
           
        if current > 0:
-          return "Charging"
+          return STATUS_CHARGING
 
     return f"unknown {value}"
     
@@ -84,10 +92,31 @@ def juicebox_message_from_bytes(data : bytes):
        # Probably is a encrypted messsage
        return JuiceboxEncryptedMessage().from_bytes(data)
    
+
+#
+# Groups used on regex patterns
+#
+PATTERN_GROUP_SERIAL = "serial"
+PATTERN_GROUP_VERSION = "version"
+PATTERN_GROUP_VALUE = "value"
+PATTERN_GROUP_TYPE = "type"
+PATTERN_GROUP_PAYLOAD = "payload"
+PATTERN_GROUP_CHECKSUM = "checksum"
    
 # ID:version   
-BASE_MESSAGE_PATTERN = r'^(?P<serial>[0-9]+):(?P<version>v[0-9]+[eu])'
-BASE_MESSAGE_PATTERN_NO_VERSION = r'^(?P<serial>[0-9]+):'
+BASE_MESSAGE_PATTERN = r'^(?P<' + PATTERN_GROUP_SERIAL + '>[0-9]+):(?P<' + PATTERN_GROUP_VERSION + '>v[0-9]+[eu])'
+BASE_MESSAGE_PATTERN_NO_VERSION = r'^(?P<' + PATTERN_GROUP_SERIAL + '>[0-9]+):'
+PAYLOAD_CHECKSUM_PATTERN = r'((?P<' + PATTERN_GROUP_PAYLOAD + '>[^!]*)(!(?P<' + PATTERN_GROUP_CHECKSUM + r'>[A-Z0-9]{3}))?(?:\$|:))'
+
+# For version there is an ending 'u' for this unencrypted messages, the 'e' encrypted messages are not supported here
+# all other values are numeric
+# Serial appear only on messages that came from juicebox device 
+PAYLOAD_PARTS_PATTERN = r'((?P<' + FIELD_SERIAL + '>[0-9]+):)?[,]?(?P<' + PATTERN_GROUP_TYPE + '>[A-Za-z]+)(?P<' + PATTERN_GROUP_VALUE + '>[-]?[0-9]+[u]?)'
+
+   
+def is_encrypted_version(version : str):
+   #   https://github.com/snicker/juicepassproxy/issues/73
+   return version == 'v09e'
    
 def juicebox_message_from_string(string : str):
    if string[0:3] == "CMD":
@@ -96,9 +125,7 @@ def juicebox_message_from_string(string : str):
    msg = re.search(BASE_MESSAGE_PATTERN, string)
       
    if msg:
-      # check for encrypted message
-      #   https://github.com/snicker/juicepassproxy/issues/73
-      if msg.group('version') == 'v09e':
+      if is_encrypted_version(msg.group(PATTERN_GROUP_VERSION)):
          return JuiceboxEncryptedMessage(str.encode(string))
 
       return JuiceboxMessage().from_string(string)
@@ -131,16 +158,30 @@ class JuiceboxMessage:
     def parse_values(self):
         # Nothing to do here now
         _LOGGER.debug(f"No values conversion on base JuiceboxMessage : {self.values}")
-    
+
+    def store_value(self, values, type, value):
+        if not type in values:
+            values[type] = value
+        else:
+            #TODO think better option after understanding of this case whe same type repeats in message
+            ok = False
+            for idx in range(1,2):
+               if not (type + ":" + str(idx)) in values:
+                  values[type + ":" + str(idx)] = value
+                  ok = True
+                  break
+            if not ok:
+                _LOGGER.error(f"Unable to store duplicate type {type}={value} other_values={values}")
+        
     def from_string(self, string: str) -> 'Message':
         _LOGGER.info(f"from_string {string}")
-        msg = re.search(r'((?P<payload>[^!]*)(!(?P<checksum>[A-Z0-9]{3}))?(?:\$|:))', string)
+        msg = re.search(PAYLOAD_CHECKSUM_PATTERN, string)
 
         if msg is None:
             raise JuiceboxInvalidMessageFormat(f"Unable to parse message: '{string}'")
 
-        self.payload_str = msg.group('payload')
-        self.checksum_str = msg.group('checksum')
+        self.payload_str = msg.group(PATTERN_GROUP_PAYLOAD)
+        self.checksum_str = msg.group(PATTERN_GROUP_CHECKSUM)
 
         if not self.has_checksum and self.checksum_str:
             raise JuiceboxInvalidMessageFormat(f"Found checksum in message that are supposed to dont have checksum '{string}'")
@@ -151,14 +192,11 @@ class JuiceboxMessage:
         values = {}        
         tmp = self.payload_str
         while len(tmp) > 0:
-            # For version there is an ending 'u' for this unencrypted messages, the 'e' encrypted messages are not supported here
-            # all other values are nummeric
-            # Serial appear only on messages that came from juicebox device 
-            data = re.search(r'((?P<serial>[0-9]+):)?[,]?(?P<type>[A-Za-z]+)(?P<value>[-]?[0-9]+[u]?)', tmp)
+            data = re.search(PAYLOAD_PARTS_PATTERN, tmp)
             if data:
-                if data.group("serial"):
-                   values["serial"] = data.group("serial")            
-                values[data.group("type")] = data.group("value")
+                if data.group(FIELD_SERIAL):
+                   values[FIELD_SERIAL] = data.group(FIELD_SERIAL)
+                self.store_value(values, data.group(PATTERN_GROUP_TYPE), data.group(PATTERN_GROUP_VALUE))
                 tmp = tmp[len(data.group(0)):]
             else: 
                _LOGGER.error(f"unable to parse value from message {tmp}")
@@ -169,12 +207,14 @@ class JuiceboxMessage:
 
         return self
 
+
     def has_value(self, type):
         if type in self.aliases:
             return self.aliases[type] in self.values
         else:
             return type in self.values
         
+
     def get_value(self, type):
            
         if self.has_value(type):
@@ -185,6 +225,7 @@ class JuiceboxMessage:
            
         return None
         
+
     def get_processed_value(self, type):
         if type in self.aliases:
            return self.get_processed_value(self.aliases[type])
@@ -194,6 +235,7 @@ class JuiceboxMessage:
 
         return self.get_value(type)
         
+
     def checksum(self) -> JuiceboxChecksum:
         return JuiceboxChecksum(self.payload_str)
 
@@ -255,7 +297,7 @@ class JuiceboxEncryptedMessage(JuiceboxMessage):
        msg = re.search(BASE_MESSAGE_PATTERN, string)
       
        if msg:
-           if msg.group("version") == "v09e":
+           if is_encrypted_version(msg.group(PATTERN_GROUP_VERSION)):
                _LOGGER.warning(f"TODO: encrypted {data}")
                # TODO
                return self

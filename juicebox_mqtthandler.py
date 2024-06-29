@@ -82,6 +82,9 @@ class JuiceboxMQTTEntity:
             if self.entity_type == 'number':
                 # float to be used by any number, JuiceboxMessage will use int
                 getattr(self._mqtt, self._set_func)(float(state))
+            elif self.entity_type == 'switch':
+                # float to be used by any number, JuiceboxMessage will use int
+                getattr(self._mqtt, self._set_func)(state.lower() == 'on')
             else:
                 getattr(self._mqtt, self._set_func)(state)
         except AttributeError as e:
@@ -199,6 +202,25 @@ class JuiceboxMQTTNumber(JuiceboxMQTTSendingEntity):
 
 
 
+class JuiceboxMQTTSwitch(JuiceboxMQTTSendingEntity):
+    def __init__(
+        self,
+        name,
+        **kwargs,
+    ):
+        # _LOGGER.debug(f"Boolean Init: {name}")
+        self.entity_type = "switch"
+        self._set_func = "update_state"
+        super().__init__(name, **kwargs)
+
+
+    def is_on(self):
+
+        if type(self.state) is str:
+           return self.state.lower() == 'on'
+           
+        return self.state
+
 
 class JuiceboxMQTTText(JuiceboxMQTTSendingEntity):
     def __init__(
@@ -281,6 +303,9 @@ class JuiceboxMQTTHandler:
                 unit_of_measurement="A",
                 min=0,
                 max=self._max_current,
+                # no initial state, to use the value that will be received from juicebox
+                # 2024-06-29 tested on v09u juicebox 
+                #   it changed the current_max_charging to this value after around 5 minutes without receiving CMD messages
             ),
             # Instant / Charging current
             "current_max_charging": JuiceboxMQTTNumber(
@@ -289,6 +314,7 @@ class JuiceboxMQTTHandler:
                 unit_of_measurement="A",
                 min=0,
                 max=self._max_current,
+                # no initial state, to use the value that will be received from juicebox
             ),
             "frequency": JuiceboxMQTTSensor(
                 name="Frequency",
@@ -325,6 +351,14 @@ class JuiceboxMQTTHandler:
                 state_class="measurement",
                 device_class="power",
                 unit_of_measurement="W",
+            ),
+            # Make possible to control from HA when juicepassproxy will act as ENEL X server for the juicebox
+            # Will only work when ignoring ENEL X server
+            "act_as_server": JuiceboxMQTTSwitch(
+                name="Act as Server",
+                enabled_by_default=False,
+                # As will only work when ignoring ENEL X server, True appear to be good for initial state
+                initial_state="ON",
             ),
             "debug_message": JuiceboxMQTTSensor(
                 name="Last Debug Message",
