@@ -104,7 +104,8 @@ PATTERN_GROUP_PAYLOAD = "payload"
 PATTERN_GROUP_CHECKSUM = "checksum"
    
 # ID:version   
-BASE_MESSAGE_PATTERN = r'^(?P<' + PATTERN_GROUP_SERIAL + '>[0-9]+):(?P<' + PATTERN_GROUP_VERSION + '>v[0-9]+[eu])'
+# Some versions came with e - encripted some with u - unencripted and some dont came with letter
+BASE_MESSAGE_PATTERN = r'^(?P<' + PATTERN_GROUP_SERIAL + '>[0-9]+):(?P<' + PATTERN_GROUP_VERSION + '>v[0-9]+[eu]?)'
 BASE_MESSAGE_PATTERN_NO_VERSION = r'^(?P<' + PATTERN_GROUP_SERIAL + '>[0-9]+):'
 PAYLOAD_CHECKSUM_PATTERN = r'((?P<' + PATTERN_GROUP_PAYLOAD + '>[^!]*)(!(?P<' + PATTERN_GROUP_CHECKSUM + r'>[A-Z0-9]{3}))?(?:\$|:))'
 

@@ -161,8 +161,10 @@ class TestMessage(unittest.TestCase):
             'CMD31353A0000M010C244S741!2B3$', # (v09u)
         ]
         checksum_messages = [
-            # Original message changed to remove real serial number
+            # Original messages changed to remove real serial number
             '0910000000000000000000000000:v09u,s001,F31,u00412974,V1366,L00004262804,S02,T28,M0024,C0024,m0032,t09,i23,e-0001,f5990,r99,b000,B0000000,P0,E0004501,A00161,p0996!ZW5:',
+            # from https://github.com/snicker/juicepassproxy/issues/90
+            '0000000000000000000000000000:v07,s0001,u30048,V2400,L0024880114,S2,T62,M40,m40,t09,i78,e-001,f6001,X0,Y0,E006804,A0394,p0992!MF8:',
         ]
         old_messages = [
             self.OLD_MESSAGE,
