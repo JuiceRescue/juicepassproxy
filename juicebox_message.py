@@ -51,12 +51,23 @@ def process_voltage(message, value):
 
     return float(value) * 0.1
     
+# For older devices that does not send the current_max value use the current_rating value
+def process_current_max(message, value):
+    if value:
+        return value
+    else:
+        return message.get_processed_value("current_rating");
+    
+# TODO add process to other messages to convert values
+
+
 
 FROM_JUICEBOX_FIELD_DEFS = {
     # Undefined parts: F, e, r, b, B, P, p
     # https://github.com/snicker/juicepassproxy/issues/52
     "A" : { "alias" : "current" },
-    "C" : { "alias" : "current_max" },
+    # max current to be used when offline
+    "C" : { "alias" : "current_max", "process" : process_current_max },
     "E" : { "alias" : "energy_session" },
     "f" : { "alias" : "frequency" },
     # i = Interval number. It contains a 96-slot interval memory (15-minute x 24-hour cycle) and
@@ -64,7 +75,9 @@ FROM_JUICEBOX_FIELD_DEFS = {
     #   (or current, if it's reporting the "right-now" interval) interval per message.
     #   The letter after "i" = the energy in that interval (usually 0 if you're not charging basically 24/7)
     "i" : { "alias" : "interval" },
+    # indicates the hardware limit
     "m" : { "alias" : "current_rating" },
+    # the max current to be used during charging
     "M" : { "alias" : "current_max_charging" },
     "L" : { "alias" : "energy_lifetime" },
     "s" : { "alias" : "counter" },
@@ -88,8 +101,8 @@ def juicebox_message_from_bytes(data : bytes):
    try:
        string = data.decode("utf-8")
        return juicebox_message_from_string(string)
-   except UnicodeDecodeError as e:
-       # Probably is a encrypted messsage
+   except UnicodeDecodeError:
+       # Probably is a encrypted messsage, try to use the specific classe
        return JuiceboxEncryptedMessage().from_bytes(data)
    
 
@@ -174,7 +187,7 @@ class JuiceboxMessage:
             if not ok:
                 _LOGGER.error(f"Unable to store duplicate type {type}={value} other_values={values}")
         
-    def from_string(self, string: str) -> 'Message':
+    def from_string(self, string: str) -> 'JuiceboxMessage':
         _LOGGER.info(f"from_string {string}")
         msg = re.search(PAYLOAD_CHECKSUM_PATTERN, string)
 

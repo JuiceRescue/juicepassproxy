@@ -149,6 +149,46 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_value("E"), "67")
         self.assertEqual(m.get_value("E:1"), "14")
 
+
+    # Original messages changed to remove real serial number
+    V09U_SAMPLE = '0910000000000000000000000000:v09u,s001,F31,u00412974,V1366,L00004262804,S02,T28,M0024,C0024,m0032,t09,i23,e-0001,f5990,r99,b000,B0000000,P0,E0004501,A00161,p0996!ZW5:';
+    # from https://github.com/snicker/juicepassproxy/issues/90
+    V07_SAMPLE = '0000000000000000000000000000:v07,s0001,u30048,V2400,L0024880114,S2,T62,M40,m40,t09,i78,e-001,f6001,X0,Y0,E006804,A0394,p0992!MF8:';
+
+
+    def test_v09(self):
+        """
+        Test v09 sample message
+        """
+
+        m = juicebox_message_from_string(self.V09U_SAMPLE)
+        chkidx = self.V09U_SAMPLE.index('!')
+        self.assertEqual(m.payload_str, self.V09U_SAMPLE[:chkidx])
+        self.assertEqual(m.checksum_str, self.V09U_SAMPLE[(chkidx+1):(chkidx+4)])
+        self.assertEqual(m.get_processed_value("status"), "Charging")
+        self.assertEqual(m.get_processed_value("voltage"), 136.6)
+        self.assertEqual(m.get_processed_value("current_rating"), "0032")
+        self.assertEqual(m.get_processed_value("current_max_charging"), "0024")
+        self.assertEqual(m.get_processed_value("current_max"), "0024")
+
+    def test_v07(self):
+        """
+        Test v07 sample message
+        """
+
+        m = juicebox_message_from_string(self.V07_SAMPLE)
+        chkidx = self.V07_SAMPLE.index('!')
+        self.assertEqual(m.payload_str, self.V07_SAMPLE[:chkidx])
+        self.assertEqual(m.checksum_str, self.V07_SAMPLE[(chkidx+1):(chkidx+4)])
+        self.assertEqual(m.get_processed_value("status"), "Charging")
+        self.assertEqual(m.get_processed_value("voltage"), 240.0)
+        self.assertEqual(m.get_processed_value("current_rating"), "40")
+        self.assertEqual(m.get_processed_value("current_max_charging"), "40")
+        # The process will return value for this parameter that are not comming on the message
+        self.assertEqual(m.get_processed_value("current_max"), "40")
+
+
+    
     def test_message_checksums(self):
         cmd_messages = [
             'CMD41325A0040M040C006S638!5N5$', # @MrDrew514 (v09u)
@@ -160,12 +200,12 @@ class TestMessage(unittest.TestCase):
             'CMD62201A20M20C006S982!QT8$',
             'CMD31353A0000M010C244S741!2B3$', # (v09u)
         ]
+        
         checksum_messages = [
-            # Original messages changed to remove real serial number
-            '0910000000000000000000000000:v09u,s001,F31,u00412974,V1366,L00004262804,S02,T28,M0024,C0024,m0032,t09,i23,e-0001,f5990,r99,b000,B0000000,P0,E0004501,A00161,p0996!ZW5:',
-            # from https://github.com/snicker/juicepassproxy/issues/90
-            '0000000000000000000000000000:v07,s0001,u30048,V2400,L0024880114,S2,T62,M40,m40,t09,i78,e-001,f6001,X0,Y0,E006804,A0394,p0992!MF8:',
+            self.V09U_SAMPLE,
+            self.V07_SAMPLE,
         ]
+        
         old_messages = [
             self.OLD_MESSAGE,
             self.OLD_MESSAGE_2,
