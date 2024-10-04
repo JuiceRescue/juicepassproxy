@@ -304,8 +304,6 @@ class JuiceboxMQTTHandler:
                 min=0,
                 max=self._max_current,
                 # no initial state, to use the value that will be received from juicebox
-                # 2024-06-29 tested on v09u juicebox 
-                #   it changed the current_max_charging to this value after around 5 minutes without receiving CMD messages
             ),
             # Instant / Charging current
             "current_max_charging": JuiceboxMQTTNumber(
