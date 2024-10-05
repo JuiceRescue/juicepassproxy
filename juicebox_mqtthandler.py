@@ -486,9 +486,14 @@ class JuiceboxMQTTHandler:
             message.get("voltage", 0) * message.get("current", 0), 2
         )
 
-        # for v07 messages that came with m and M but no C parameter lets assume the max offline is the same of the current_rating
-        if ("current_rating" in message) and (not "current_max" in message):
-            message["current_max"] = message["current_rating"]
+        # for v07 messages that came with m and M but no C parameter lets assume the min received value
+        if not "current_max" in message:
+            if ("current_rating" in message) and ("current_max_charging" in message):
+                message["current_max"] = min(message["current_rating"], message["current_max_charging"])
+            elif ("current_rating" in message): 
+                message["current_max"] = message["current_rating"]
+            elif ("current_max_charging" in message): 
+                message["current_max"] = message["current_max_charging"]
 
         message["data_from_juicebox"] = data.decode("utf-8")
         return message

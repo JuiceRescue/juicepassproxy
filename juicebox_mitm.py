@@ -260,17 +260,21 @@ class JuiceboxMITM:
           return None
           
        # TODO: check which other versions can be considered as new_version of protocol
+       # packet captures indicate that v07 uses old version
        new_version = self._last_message and (self._last_message.get_value("v") == "09u")
        if self._last_command:
           message = JuiceboxCommand(previous=self._last_command, new_version=new_version)
        else:
           message = JuiceboxCommand(new_version=new_version)
-          # Must start with values 
+          # Should start with values 
           new_values = True
           
        if new_values:
-           message.offline_amperage = int(self._mqtt_handler.get_entity("current_max").state)
-           message.instant_amperage = int(self._mqtt_handler.get_entity("current_max_charging").state)
+           if self.is_mqtt_numeric_entity_defined("current_max"):
+               message.offline_amperage = int(self._mqtt_handler.get_entity("current_max").state)
+
+           if self.is_mqtt_numeric_entity_defined("current_max_charging"):
+               message.instant_amperage = int(self._mqtt_handler.get_entity("current_max_charging").state)
 
        _LOGGER.info(f"command message = {message} new_values={new_values} new_version={new_version}")
 
@@ -282,14 +286,10 @@ class JuiceboxMITM:
        
        if self._mqtt_handler.get_entity("act_as_server").is_on():
 
-          # Max current values must be define to send messages to device
-          if self.is_mqtt_numeric_entity_defined("current_max") and self.is_mqtt_numeric_entity_defined("current_max_charging"):
-              cmd_message = self.__build_cmd_message(new_values)
-              if cmd_message:
-                  _LOGGER.info(f"Sending command to juicebox {cmd_message} new_values={new_values}")
-                  await self.send_data(cmd_message.encode('utf-8'), self._juicebox_addr)
-          else:
-              _LOGGER.warn("Unable to send command to juicebox before current_max and current_max_charging values are set") 
+          cmd_message = self.__build_cmd_message(new_values)
+          if cmd_message:
+              _LOGGER.info(f"Sending command to juicebox {cmd_message} new_values={new_values}")
+              await self.send_data(cmd_message.encode('utf-8'), self._juicebox_addr)
 
     async def set_mqtt_handler(self, mqtt_handler):
         self._mqtt_handler = mqtt_handler
