@@ -156,8 +156,9 @@ class JuiceboxUDPCUpdater:
                     _LOGGER.debug(f"Closing UDPC stream: {id}")
                     await self._telnet.close_udpc_stream(id)
                 await self._telnet.write_udpc_stream(self._jpp_host, self._udpc_port)
-                await self._telnet.save_udpc()
-                _LOGGER.info("UDPC IP Saved")
+                # Save is not recommended https://github.com/snicker/juicepassproxy/issues/96
+                # await self._telnet.save_udpc()
+                _LOGGER.info("UDPC IP Changed")
         except ConnectionResetError as e:
             _LOGGER.warning(
                 "Telnet connection to JuiceBox lost. "
