@@ -5,22 +5,24 @@ import codecs
 import datetime
 
 class TestMessage(unittest.TestCase):
-    def test_message_building(self):
-        m = JuiceboxCommand()
+
+    def do_test_message_building(self, new_version, offline_amperage, instant_amperage, full_command):
+        m = JuiceboxCommand(new_version=new_version)
         m.time = datetime.datetime(2012, 3, 23, 23, 24, 55, 173504)
-        m.offline_amperage = 16
-        m.instant_amperage = 20
-        self.assertEqual(m.build(), "CMD52324A20M16C006S001!5RE$")
-#        print(m.inspect())
+        m.offline_amperage = offline_amperage
+        m.instant_amperage = instant_amperage
+        self.assertEqual(m.build(), full_command)
+    
+    def test_message_building(self):
+        self.do_test_message_building(False, 16, 20, "CMD52324A20M16C006S001!5RE$")
+        self.do_test_message_building(False, None, 20, "CMD52324A20C006S001!NVK$")
+        self.do_test_message_building(False, 16, None, "CMD52324M16C006S001!BHS$")
 
 
     def test_message_building_new(self):
-        m = JuiceboxCommand(new_version=True)
-        m.time = datetime.datetime(2012, 3, 23, 23, 24, 55, 173504)
-        m.offline_amperage = 16
-        m.instant_amperage = 20
-        self.assertEqual(m.build(), "CMD52324A0020M016C006S001!YUK$")
-#        print(m.inspect())
+        self.do_test_message_building(True, 16, 20, "CMD52324A0020M016C006S001!YUK$")
+        self.do_test_message_building(True, None, 20, "CMD52324A0020C006S001!NJ5$")
+        self.do_test_message_building(True, 16, None, "CMD52324M016C006S001!SV9$")
 
 
     def test_entrypted_message(self):
@@ -42,7 +44,7 @@ class TestMessage(unittest.TestCase):
         for message in messages:
             with self.assertRaises(JuiceboxInvalidMessageFormat):
                 print(f"bad : {message}")
-                m = juicebox_message_from_string(message)
+                juicebox_message_from_string(message)
 
 
     def test_command_message_parsing(self):
@@ -199,6 +201,16 @@ class TestMessage(unittest.TestCase):
             'CMD62201A20M20C244S981!ECD$',
             'CMD62201A20M20C006S982!QT8$',
             'CMD31353A0000M010C244S741!2B3$', # (v09u)
+            # https://github.com/snicker/juicepassproxy/issues/90
+            'CMD41301A40M40C006S074!F0P$',
+            'CMD41301A29M40C242S075!TJ5$',
+            'CMD41301A40M40C008S076!YCA$',
+            'CMD41301A40M40C244S077!B72$',
+            'CMD41301A40M40C006S078!J0P$',
+            'CMD41301A40M40C242S079!RQ7$',
+            'CMD41302A40M40C008S080!S9E$',
+            'CMD41302A40M40C244S081!T2P$',
+            'CMD41302A40M40C006S082!KQL$'
         ]
         
         checksum_messages = [

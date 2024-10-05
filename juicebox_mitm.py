@@ -157,7 +157,7 @@ class JuiceboxMITM:
             try:
                 self._last_message = juicebox_message_from_bytes(data)
             except Exception as e:
-                _LOGGER.exception(f"Not a valid juicebox message {data}")
+                _LOGGER.exception(f"Not a valid juicebox message {data} {e}")
 
             data = await self._local_mitm_handler(data)
 
