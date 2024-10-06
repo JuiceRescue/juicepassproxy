@@ -5,7 +5,7 @@ import codecs
 import datetime
 
 #
-# Some messages here are not the real one captured, the serial number of device was changed after doing tests with real values and checksum corrected
+# Some messages here are not the real one captured, the serial number of device was changed after doing tests with real values and crc corrected
 #
 class TestMessage(unittest.TestCase):
 
@@ -57,8 +57,8 @@ class TestMessage(unittest.TestCase):
         raw_msg = "CMD41325A0040M040C006S638!5N5$"
         m = juicebox_message_from_string(raw_msg)
         self.assertEqual(m.payload_str, "CMD41325A0040M040C006S638")
-        self.assertEqual(m.checksum_str, "5N5")
-        self.assertEqual(m.checksum_str, m.checksum_computed())
+        self.assertEqual(m.crc_str, "5N5")
+        self.assertEqual(m.crc_str, m.crc_computed())
         self.assertEqual(m.build(), raw_msg)
 
         self.assertEqual(m.get_value("DOW"), "4")
@@ -74,8 +74,8 @@ class TestMessage(unittest.TestCase):
 
         m = juicebox_message_from_string(raw_msg)
         self.assertEqual(m.payload_str, "0910000000000000000000000000:v09u,s627,F10,u01254993,V2414,L00004555804,S01,T08,M0040,C0040,m0040,t29,i75,e00000,f5999,r61,b000,B0000000")
-        self.assertEqual(m.checksum_str, "S1H")
-        self.assertEqual(m.checksum_str, m.checksum_computed())
+        self.assertEqual(m.crc_str, "S1H")
+        self.assertEqual(m.crc_str, m.crc_computed())
         self.assertEqual(True, m.has_value("C"))
         self.assertEqual(m.get_value("C"), "0040")
         self.assertEqual(m.get_value("v"), "09u")
@@ -106,12 +106,14 @@ class TestMessage(unittest.TestCase):
 
         m = juicebox_message_from_string(self.OLD_MESSAGE)
         self.assertEqual(m.payload_str, self.OLD_MESSAGE[:-1])
-        self.assertEqual(m.checksum_str, None)
+        self.assertEqual(m.crc_str, None)
         self.assertEqual(m.get_value("serial"), self.FAKE_SERIAL)
         self.assertEqual(m.get_processed_value("status"), "Unplugged")
         self.assertEqual(m.get_processed_value("voltage"), 247)
         self.assertEqual(m.get_value("temperature"), "34")
         self.assertEqual(m.get_processed_value("temperature"), 93.2)
+        # TODO complete other tests with this kind of assert 
+        self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 0, "serial" : self.FAKE_SERIAL, "status" : "Unplugged", "voltage": 247.0, "temperature" : 93.2, "energy_lifetime": 11097,  "energy_session": 14, "interval": 84,  "report_time": "30", "e" : "1"})
 
     def test_old_message_2(self):
         """
@@ -120,7 +122,7 @@ class TestMessage(unittest.TestCase):
 
         m = juicebox_message_from_string(self.OLD_MESSAGE_2)
         self.assertEqual(m.payload_str, self.OLD_MESSAGE_2[:-1])
-        self.assertEqual(m.checksum_str, None)
+        self.assertEqual(m.crc_str, None)
         self.assertEqual(m.get_value("serial"), self.FAKE_SERIAL)
         self.assertEqual(m.get_processed_value("status"), "Charging")
         self.assertEqual(m.get_value("temperature"), "28")
@@ -137,7 +139,7 @@ class TestMessage(unittest.TestCase):
 
         m = juicebox_message_from_string(self.OLD_CHARGING)
         self.assertEqual(m.payload_str, self.OLD_CHARGING[:-1])
-        self.assertEqual(m.checksum_str, None)
+        self.assertEqual(m.crc_str, None)
         self.assertEqual(m.get_value("serial"), self.FAKE_SERIAL)
         self.assertEqual(m.get_processed_value("status"), "Charging")
         self.assertEqual(m.get_processed_value("voltage"), 247)
@@ -154,7 +156,7 @@ class TestMessage(unittest.TestCase):
 
         m = juicebox_message_from_string(self.OLD_PLUGGED_IN)
         self.assertEqual(m.payload_str, self.OLD_PLUGGED_IN[:-1])
-        self.assertEqual(m.checksum_str, None)
+        self.assertEqual(m.crc_str, None)
         self.assertEqual(m.get_value("serial"), self.FAKE_SERIAL)
         self.assertEqual(m.get_processed_value("status"), "Plugged In")
         self.assertEqual(m.get_processed_value("voltage"), 247)
@@ -179,7 +181,7 @@ class TestMessage(unittest.TestCase):
         m = juicebox_message_from_string(self.V09U_SAMPLE)
         chkidx = self.V09U_SAMPLE.index('!')
         self.assertEqual(m.payload_str, self.V09U_SAMPLE[:chkidx])
-        self.assertEqual(m.checksum_str, self.V09U_SAMPLE[(chkidx+1):(chkidx+4)])
+        self.assertEqual(m.crc_str, self.V09U_SAMPLE[(chkidx+1):(chkidx+4)])
         self.assertEqual(m.get_processed_value("status"), "Charging")
         self.assertEqual(m.get_processed_value("voltage"), 136.6)
         self.assertEqual(m.get_processed_value("current_rating"), 32)
@@ -199,7 +201,7 @@ class TestMessage(unittest.TestCase):
         m = juicebox_message_from_string(self.V07_SAMPLE)
         chkidx = self.V07_SAMPLE.index('!')
         self.assertEqual(m.payload_str, self.V07_SAMPLE[:chkidx])
-        self.assertEqual(m.checksum_str, self.V07_SAMPLE[(chkidx+1):(chkidx+4)])
+        self.assertEqual(m.crc_str, self.V07_SAMPLE[(chkidx+1):(chkidx+4)])
         self.assertEqual(m.get_processed_value("status"), "Charging")
         self.assertEqual(m.get_processed_value("voltage"), 240.0)
         self.assertEqual(m.get_processed_value("current_rating"), 40)
@@ -214,7 +216,7 @@ class TestMessage(unittest.TestCase):
 
 
     
-    def test_message_checksums(self):
+    def test_message_crcs(self):
         cmd_messages = [
             'CMD41325A0040M040C006S638!5N5$', # @MrDrew514 (v09u)
             'CMD62210A20M18C006S006!31Y$',
@@ -236,7 +238,7 @@ class TestMessage(unittest.TestCase):
             'CMD41302A40M40C006S082!KQL$'
         ]
         
-        checksum_messages = [
+        crc_messages = [
             self.V09U_SAMPLE,
             self.V07_SAMPLE,
         ]
@@ -245,6 +247,7 @@ class TestMessage(unittest.TestCase):
             "0000000000000000000000000000:DBG,NFO:BOT:EMWERK-JB_1_1-1.4.0.28, 2021-04-27T20:39:50Z, ZentriOS-WZ-3.6.4.0:",
             "0000000000000000000000000000:DBG,NFO:BOT:FW Init.ENC.Y/ECDAYS.90/EVT.Y/ECHTTP.Y:",
             "0000000000000000000000000000:DBG,NFO:BOT:UUID 0000000000000000000000000000000000000000:",
+            "0000000000000000000000000000:DBG,ERR:Miss CRC 'CMD01216A27M30C006S23':"
         ]
         
         old_messages = [
@@ -254,21 +257,21 @@ class TestMessage(unittest.TestCase):
             self.OLD_CHARGING
         ]
 
-        for message in (cmd_messages + checksum_messages + old_messages + debug_messages):
+        for message in (cmd_messages + crc_messages + old_messages + debug_messages):
             m = juicebox_message_from_string(message)
 
             self.assertEqual(m.build(), message)
-            self.assertEqual(m.checksum_str, m.checksum_computed())
+            self.assertEqual(m.crc_str, m.crc_computed())
 #            print(m.inspect())
 
 
-        for message in checksum_messages:
-            # expect for error when trying to parse a checksum message ignoring checksum
+        for message in crc_messages:
+            # expect for error when trying to parse a crc message ignoring crc
             with self.assertRaises(JuiceboxInvalidMessageFormat):
                 m = JuiceboxMessage(False).from_string(message)
 
         for message in old_messages:
-            # expect for error when trying to parse old message without checking considering checksum
+            # expect for error when trying to parse old message without checking considering crc
             with self.assertRaises(JuiceboxInvalidMessageFormat):
                 m = JuiceboxMessage().from_string(message)
 

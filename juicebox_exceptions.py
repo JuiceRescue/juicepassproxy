@@ -9,5 +9,5 @@ class JuiceboxInvalidMessageFormat(JuiceboxException):
     pass
 
 
-class JuiceboxChecksumError(JuiceboxException):
+class JuiceboxCRCError(JuiceboxException):
     pass

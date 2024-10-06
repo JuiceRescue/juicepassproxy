@@ -49,7 +49,7 @@ class JuiceboxMITM:
         # Last command sent to juicebox device
         self._last_command = None
         # Last message received from juicebox device
-        self._last_message = None
+        self._last_status_message = None
 
     async def start(self) -> None:
         _LOGGER.info("Starting JuiceboxMITM")
@@ -154,14 +154,15 @@ class JuiceboxMITM:
         if from_addr == self._juicebox_addr:
             # Must decode message to give correct command response based on version
             # Also this decoded message can be passed to the mqtt handler to skip a new decoding
+            decoded_message = None
             try:
                 decoded_message = juicebox_message_from_bytes(data)
                 if isinstance(decoded_message, JuiceboxStatusMessage):
-                    self._last_message = decoded_message
+                    self._last_status_message = decoded_message
             except Exception as e:
-                _LOGGER.exception(f"Not a valid juicebox message {data} {e}")
+                _LOGGER.exception(f"Not a valid juicebox message |{data}| {e}")
 
-            data = await self._local_mitm_handler(data)
+            data = await self._local_mitm_handler(data, decoded_message)
 
             if self._ignore_enelx:
                 # Keep sending responses to local juicebox like the enelx servers using last values
@@ -257,13 +258,13 @@ class JuiceboxMITM:
         
     def __build_cmd_message(self, new_values):
        
-       if type(self._last_message) is JuiceboxEncryptedMessage:
+       if type(self._last_status_message) is JuiceboxEncryptedMessage:
           _LOGGER.info("Responses for encrypted protocol not supported yet")
           return None
           
        # TODO: check which other versions can be considered as new_version of protocol
        # packet captures indicate that v07 uses old version
-       new_version = self._last_message and (self._last_message.get_value("v") == "09u")
+       new_version = self._last_status_message and (self._last_status_message.get_value("v") == "09u")
        if self._last_command:
           message = JuiceboxCommand(previous=self._last_command, new_version=new_version)
        else:

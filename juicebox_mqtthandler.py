@@ -7,6 +7,7 @@ import ha_mqtt_discoverable.sensors as ha_mqtt
 from const import ERROR_LOOKBACK_MIN, VERSION  # MAX_ERROR_COUNT,
 from ha_mqtt_discoverable import DeviceInfo, Settings
 from paho.mqtt.client import Client, MQTTMessage
+from juicebox_message import JuiceboxStatusMessage, JuiceboxDebugMessage
 
 _LOGGER = logging.getLogger(__name__)
 MQTT_SENDING_ENTITIES = ["text", "number", "switch", "button"]
@@ -429,7 +430,7 @@ class JuiceboxMQTTHandler:
         parts = re.split(r",|!|:", data.decode("utf-8"))
         parts.pop(0)  # JuiceBox ID
         parts.pop(-1)  # Ending blank
-        parts.pop(-1)  # Checksum
+        parts.pop(-1)  # CRC
 
         for part in parts:
             if part[0] == "S":
@@ -583,16 +584,25 @@ class JuiceboxMQTTHandler:
         #        f"Exception handling remote data. ({e.__class__.__qualname__}: {e})"
         #    )
 
-    async def local_mitm_handler(self, data):
+    async def local_mitm_handler(self, data, decoded_message):
         message = None
         try:
-            _LOGGER.debug(f"From JuiceBox: {data}")
+            _LOGGER.debug(f"From JuiceBox: {data} decoded={decoded_message}")
             if "JuiceboxMITM_OSERROR" in str(data):
                 message = await self._udp_mitm_oserror_message_parse(data)
+                
+            # Now using the classes as priority over older code
+            elif isinstance(decoded_message, JuiceboxStatusMessage):
+                message = decoded_message.to_simple_format()
+            elif isinstance(decoded_message, JuiceboxDebugMessage):
+                message = decoded_message.to_simple_format()
+            # still using old code for messages that cannot be decoded                
+            # should be removed in future versions
             elif ":DBG," in str(data):
                 message = await self._debug_message_parse(data)
             else:
                 message = await self._basic_message_parse(data)
+                
             if message:
                 await self._basic_message_publish(message)
             return data

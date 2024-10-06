@@ -1,7 +1,7 @@
 #
 # Original source  : https://github.com/philipkocanda/juicebox-protocol
 #
-class JuiceboxChecksum:
+class JuiceboxCRC:
     ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
     def __init__(self, payload: str) -> None:

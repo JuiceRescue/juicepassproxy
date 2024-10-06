@@ -1,7 +1,7 @@
 #
 # Original source  : https://github.com/philipkocanda/juicebox-protocol
 #
-from juicebox_checksum import JuiceboxChecksum
+from juicebox_crc import JuiceboxCRC
 from juicebox_exceptions import JuiceboxInvalidMessageFormat
 import datetime
 import logging
@@ -124,17 +124,17 @@ PATTERN_GROUP_SERIAL = "serial"
 PATTERN_GROUP_VERSION = "version"
 PATTERN_GROUP_VALUE = "value"
 PATTERN_GROUP_TYPE = "type"
-# all payload from message except checksum
+# all payload from message except crc
 PATTERN_GROUP_PAYLOAD = "payload"
 # data from payload (excluding serial number)
 PATTERN_GROUP_DATA_PAYLOAD = "data_payload"
-PATTERN_GROUP_CHECKSUM = "checksum"
+PATTERN_GROUP_CRC = "crc"
    
 # ID:version   
 # Some versions came with e - encripted some with u - unencripted and some dont came with letter
 BASE_MESSAGE_PATTERN = r'^(?P<' + PATTERN_GROUP_SERIAL + '>[0-9]+):(?P<' + PATTERN_GROUP_VERSION + '>v[0-9]+[eu]?)'
-BASE_MESSAGE_PATTERN_NO_VERSION = r'^(?P<' + PATTERN_GROUP_SERIAL + '>[0-9]+):(?P<' + PATTERN_GROUP_DATA_PAYLOAD + '>.*):'
-PAYLOAD_CHECKSUM_PATTERN = r'((?P<' + PATTERN_GROUP_PAYLOAD + '>[^!]*)(!(?P<' + PATTERN_GROUP_CHECKSUM + r'>[A-Z0-9]{3}))?(?:\$|:))'
+BASE_MESSAGE_PATTERN_NO_VERSION = r'^(?P<' + PATTERN_GROUP_SERIAL + '>[0-9]+):(?P<' + PATTERN_GROUP_DATA_PAYLOAD + '>.*)'
+PAYLOAD_CRC_PATTERN = r'((?P<' + PATTERN_GROUP_PAYLOAD + '>[^!]*)(!(?P<' + PATTERN_GROUP_CRC + r'>[A-Z0-9]{3}))?(?:\$|:))'
 
 # For version there is an ending 'u' for this unencrypted messages, the 'e' encrypted messages are not supported here
 # all other values are numeric
@@ -171,10 +171,10 @@ def juicebox_message_from_string(string : str):
       
 class JuiceboxMessage:
 
-    def __init__(self, has_checksum=True, defs={}) -> None:
-        self.has_checksum = has_checksum
+    def __init__(self, has_crc=True, defs={}) -> None:
+        self.has_crc = has_crc
         self.payload_str = None
-        self.checksum_str = None
+        self.crc_str = None
         self.values = None
         self.end_char = ':'
         self.defs = defs        
@@ -206,19 +206,19 @@ class JuiceboxMessage:
         
     def from_string(self, string: str) -> 'JuiceboxMessage':
         _LOGGER.info(f"from_string {string}")
-        msg = re.search(PAYLOAD_CHECKSUM_PATTERN, string)
+        msg = re.search(PAYLOAD_CRC_PATTERN, string)
 
         if msg is None:
             raise JuiceboxInvalidMessageFormat(f"Unable to parse message: '{string}'")
 
         self.payload_str = msg.group(PATTERN_GROUP_PAYLOAD)
-        self.checksum_str = msg.group(PATTERN_GROUP_CHECKSUM)
+        self.crc_str = msg.group(PATTERN_GROUP_CRC)
 
-        if not self.has_checksum and self.checksum_str:
-            raise JuiceboxInvalidMessageFormat(f"Found checksum in message that are supposed to dont have checksum '{string}'")
+        if not self.has_crc and self.crc_str:
+            raise JuiceboxInvalidMessageFormat(f"Found crc in message that are supposed to dont have crc '{string}'")
 
-        if self.has_checksum and not self.checksum_str:
-            raise JuiceboxInvalidMessageFormat(f"Checksum not found in message that are supposed to have checksum '{string}'")
+        if self.has_crc and not self.crc_str:
+            raise JuiceboxInvalidMessageFormat(f"CRC not found in message that are supposed to have crc '{string}'")
 
         values = {}        
         tmp = self.payload_str
@@ -230,7 +230,7 @@ class JuiceboxMessage:
                 self.store_value(values, data.group(PATTERN_GROUP_TYPE), data.group(PATTERN_GROUP_VALUE))
                 tmp = tmp[len(data.group(0)):]
             else: 
-               _LOGGER.error(f"unable to parse value from message {tmp}")
+               _LOGGER.error(f"unable to parse value from message tmp='{tmp}', string='{string}'")
                break
 
         self.values = values
@@ -267,13 +267,13 @@ class JuiceboxMessage:
         return self.get_value(type)
         
 
-    def checksum(self) -> JuiceboxChecksum:
-        return JuiceboxChecksum(self.payload_str)
+    def crc(self) -> JuiceboxCRC:
+        return JuiceboxCRC(self.payload_str)
 
 
-    def checksum_computed(self) -> str:
-        if self.has_checksum:
-            return self.checksum().base35()
+    def crc_computed(self) -> str:
+        if self.has_crc:
+            return self.crc().base35()
         else:
             return None
 
@@ -287,8 +287,8 @@ class JuiceboxMessage:
 
     def build(self) -> str:
         self.build_payload()
-        if self.has_checksum:
-            return f"{(self.payload_str)}!{self.checksum_str}{self.end_char}"
+        if self.has_crc:
+            return f"{(self.payload_str)}!{self.crc_str}{self.end_char}"
         else:
             return f"{(self.payload_str)}{self.end_char}"
 
@@ -297,10 +297,10 @@ class JuiceboxMessage:
         data = {
             "payload_str": self.payload_str,
         }
-        if self.has_checksum:
+        if self.has_crc:
            data.update({
-            "checksum_str": self.checksum_str,
-            "checksum_computed": self.checksum_computed(),
+            "crc_str": self.crc_str,
+            "crc_computed": self.crc_computed(),
            })
 
         # Generic base class does not know specific fields, then put all split values
@@ -321,8 +321,18 @@ class JuiceboxMessage:
 
 class JuiceboxStatusMessage(JuiceboxMessage):
 
-    def __init__(self, has_checksum=True, defs=FROM_JUICEBOX_FIELD_DEFS) -> None:
-        super().__init__(has_checksum=has_checksum, defs=defs)
+    def __init__(self, has_crc=True, defs=FROM_JUICEBOX_FIELD_DEFS) -> None:
+        super().__init__(has_crc=has_crc, defs=defs)
+        
+    # Generate data like old processing
+    def to_simple_format(self):
+        data = { "type" : "basic", "current": 0, "energy_session": 0}
+        for k in self.values:
+            if k in self.defs:
+               data[self.defs[k]["alias"]] = self.get_processed_value(k)
+            else:
+               data[k] = self.values[k]
+        return data
 
 
 class JuiceboxEncryptedMessage(JuiceboxStatusMessage):
@@ -374,8 +384,8 @@ class JuiceboxCommand(JuiceboxMessage):
             "instant_amperage": self.instant_amperage,
             "counter": self.counter,
             "payload_str": self.payload_str,
-            "checksum_str": self.checksum_str,
-            "checksum_computed": self.checksum_computed(),
+            "crc_str": self.crc_str,
+            "crc_computed": self.crc_computed(),
         }
 
         # add any extra received value        
@@ -411,7 +421,7 @@ class JuiceboxCommand(JuiceboxMessage):
             if self.offline_amperage:
                 self.payload_str += f"M{self.offline_amperage:02d}"
         self.payload_str += f"C{self.command:03d}S{self.counter:03d}"
-        self.checksum_str = self.checksum_computed()
+        self.crc_str = self.crc_computed()
 
     def parse_values(self):
         if "CMD" in self.values:
@@ -434,18 +444,28 @@ class JuiceboxCommand(JuiceboxMessage):
         _LOGGER.info(f"parse_values values {self.values}")
 
 
+#
+# Juicebox send this debug messages during reboot or in some cases when it does like command received
+# if server send a command message to a juicebox that expect crc without the crc it will send a debug message complaining "Miss CRC"
+#
+
+
 class JuiceboxDebugMessage(JuiceboxMessage):
 
     def __init__(self) -> None:
-        super().__init__(has_checksum=False)
+        super().__init__(has_crc=False)
 
     def from_string(self, string: str) -> 'JuiceboxMessage':
         _LOGGER.info(f"from_string {string}")
         msg = re.search(BASE_MESSAGE_PATTERN_NO_VERSION, string)
-        self.values = {}
+        self.values = { "type" : "debug" }
         self.values[FIELD_SERIAL] = msg.group(PATTERN_GROUP_SERIAL)
 #TODO split and convert level like _debug_message_parse
         self.values["debug_message"] = msg.group(PATTERN_GROUP_DATA_PAYLOAD)
+        #TODO use better regex to remove this end_char on pattern match
+        if self.values["debug_message"].endswith(self.end_char):
+           self.values["debug_message"] = self.values["debug_message"][:-1]
+        
         
         return self
         
@@ -456,3 +476,6 @@ class JuiceboxDebugMessage(JuiceboxMessage):
         self.payload_str = self.values[FIELD_SERIAL] + ':' + self.values["debug_message"]
 
 
+    # Generate data like old processing
+    def to_simple_format(self):
+        return self.values
