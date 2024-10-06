@@ -172,9 +172,12 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.checksum_str, self.V09U_SAMPLE[(chkidx+1):(chkidx+4)])
         self.assertEqual(m.get_processed_value("status"), "Charging")
         self.assertEqual(m.get_processed_value("voltage"), 136.6)
-        self.assertEqual(m.get_processed_value("current_rating"), "0032")
-        self.assertEqual(m.get_processed_value("current_max_charging"), "0024")
-        self.assertEqual(m.get_processed_value("current_max"), "0024")
+        self.assertEqual(m.get_processed_value("current_rating"), 32)
+        self.assertEqual(m.get_processed_value("current_max_charging"), 24)
+        self.assertEqual(m.get_processed_value("current_max"), 24)
+        self.assertEqual(m.get_processed_value("energy_session"), 4501)
+        self.assertEqual(m.get_processed_value("energy_lifetime"), 4262804)
+        self.assertEqual(m.get_processed_value("interval"), 23)
 
     def test_v07(self):
         """
@@ -187,10 +190,13 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.checksum_str, self.V07_SAMPLE[(chkidx+1):(chkidx+4)])
         self.assertEqual(m.get_processed_value("status"), "Charging")
         self.assertEqual(m.get_processed_value("voltage"), 240.0)
-        self.assertEqual(m.get_processed_value("current_rating"), "40")
-        self.assertEqual(m.get_processed_value("current_max_charging"), "40")
+        self.assertEqual(m.get_processed_value("current_rating"), 40)
+        self.assertEqual(m.get_processed_value("current_max_charging"), 40)
         # The process will return value for this parameter that are not comming on the message
-        self.assertEqual(m.get_processed_value("current_max"), "40")
+        self.assertEqual(m.get_processed_value("current_max"), 40)
+        self.assertEqual(m.get_processed_value("energy_session"), 6804)
+        self.assertEqual(m.get_processed_value("energy_lifetime"), 24880114)
+        self.assertEqual(m.get_processed_value("interval"), 78)
 
 
     

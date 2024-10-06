@@ -51,10 +51,18 @@ def process_voltage(message, value):
 
     return float(value) * 0.1
     
+def process_int(message, value):
+
+    return int(value)
+    
+def process_float(message, value):
+
+    return float(value)
+    
 # For older devices that does not send the current_max value use the current_rating value
 def process_current_max(message, value):
     if value:
-        return value
+        return int(value)
     else:
         return message.get_processed_value("current_rating");
     
@@ -65,27 +73,27 @@ def process_current_max(message, value):
 FROM_JUICEBOX_FIELD_DEFS = {
     # Undefined parts: F, e, r, b, B, P, p
     # https://github.com/snicker/juicepassproxy/issues/52
-    "A" : { "alias" : "current" },
+    "A" : { "alias" : "current", "process" : process_float },
     # max current to be used when offline
     "C" : { "alias" : "current_max", "process" : process_current_max },
-    "E" : { "alias" : "energy_session" },
+    "E" : { "alias" : "energy_session", "process" : process_int  },
     "f" : { "alias" : "frequency" },
     # i = Interval number. It contains a 96-slot interval memory (15-minute x 24-hour cycle) and
     #   this tells you how much energy was consumed in the rolling window as it reports one past
     #   (or current, if it's reporting the "right-now" interval) interval per message.
     #   The letter after "i" = the energy in that interval (usually 0 if you're not charging basically 24/7)
-    "i" : { "alias" : "interval" },
+    "i" : { "alias" : "interval", "process" : process_int },
     # indicates the hardware limit
-    "m" : { "alias" : "current_rating" },
+    "m" : { "alias" : "current_rating", "process" : process_int },
     # the max current to be used during charging
-    "M" : { "alias" : "current_max_charging" },
-    "L" : { "alias" : "energy_lifetime" },
+    "M" : { "alias" : "current_max_charging", "process" : process_int },
+    "L" : { "alias" : "energy_lifetime", "process" : process_int },
     "s" : { "alias" : "counter" },
     "S" : { "alias" : "status", "process" : process_status },
     # t - probably the report time in seconds - "every 9 seconds" (or may end up being 10).
     #   It can change its reporting interval if the bit mask in the reply command indicates that it should send reports faster (yet to be determined).
     "t" : { "alias" : "report_time" },
-    "T" : { "alias" : "temperature" },
+    "T" : { "alias" : "temperature", "process" : process_int },
     "u" : { "alias" : "loop_counter" },
     "v" : { "alias" : "protocol_version" },
     "V" : { "alias" : "voltage", "process" : process_voltage },
