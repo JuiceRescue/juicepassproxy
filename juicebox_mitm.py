@@ -12,7 +12,7 @@ from const import (
     MITM_RECV_TIMEOUT,
     MITM_SEND_DATA_TIMEOUT,
 )
-from juicebox_message import JuiceboxCommand, JuiceboxEncryptedMessage, juicebox_message_from_bytes
+from juicebox_message import JuiceboxCommand, JuiceboxStatusMessage, JuiceboxEncryptedMessage, juicebox_message_from_bytes
 
 # Began with https://github.com/rsc-dev/pyproxy and rewrote when moving to async.
 
@@ -155,7 +155,9 @@ class JuiceboxMITM:
             # Must decode message to give correct command response based on version
             # Also this decoded message can be passed to the mqtt handler to skip a new decoding
             try:
-                self._last_message = juicebox_message_from_bytes(data)
+                decoded_message = juicebox_message_from_bytes(data)
+                if isinstance(decoded_message, JuiceboxStatusMessage):
+                    self._last_message = decoded_message
             except Exception as e:
                 _LOGGER.exception(f"Not a valid juicebox message {data} {e}")
 

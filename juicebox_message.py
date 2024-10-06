@@ -113,13 +113,16 @@ PATTERN_GROUP_SERIAL = "serial"
 PATTERN_GROUP_VERSION = "version"
 PATTERN_GROUP_VALUE = "value"
 PATTERN_GROUP_TYPE = "type"
+# all payload from message except checksum
 PATTERN_GROUP_PAYLOAD = "payload"
+# data from payload (excluding serial number)
+PATTERN_GROUP_DATA_PAYLOAD = "data_payload"
 PATTERN_GROUP_CHECKSUM = "checksum"
    
 # ID:version   
 # Some versions came with e - encripted some with u - unencripted and some dont came with letter
 BASE_MESSAGE_PATTERN = r'^(?P<' + PATTERN_GROUP_SERIAL + '>[0-9]+):(?P<' + PATTERN_GROUP_VERSION + '>v[0-9]+[eu]?)'
-BASE_MESSAGE_PATTERN_NO_VERSION = r'^(?P<' + PATTERN_GROUP_SERIAL + '>[0-9]+):'
+BASE_MESSAGE_PATTERN_NO_VERSION = r'^(?P<' + PATTERN_GROUP_SERIAL + '>[0-9]+):(?P<' + PATTERN_GROUP_DATA_PAYLOAD + '>.*):'
 PAYLOAD_CHECKSUM_PATTERN = r'((?P<' + PATTERN_GROUP_PAYLOAD + '>[^!]*)(!(?P<' + PATTERN_GROUP_CHECKSUM + r'>[A-Z0-9]{3}))?(?:\$|:))'
 
 # For version there is an ending 'u' for this unencrypted messages, the 'e' encrypted messages are not supported here
@@ -142,11 +145,14 @@ def juicebox_message_from_string(string : str):
       if is_encrypted_version(msg.group(PATTERN_GROUP_VERSION)):
          return JuiceboxEncryptedMessage(str.encode(string))
 
-      return JuiceboxMessage().from_string(string)
+      return JuiceboxStatusMessage().from_string(string)
 
    msg = re.search(BASE_MESSAGE_PATTERN_NO_VERSION, string)
    if msg:
-      return JuiceboxMessage(False).from_string(string)
+      if msg.group(PATTERN_GROUP_DATA_PAYLOAD)[:3] == 'DBG':
+          return JuiceboxDebugMessage().from_string(string)
+      else:   
+          return JuiceboxStatusMessage(False).from_string(string)
       
    raise JuiceboxInvalidMessageFormat(f"Unable to parse message: '{string}'")
       
@@ -154,7 +160,7 @@ def juicebox_message_from_string(string : str):
       
 class JuiceboxMessage:
 
-    def __init__(self, has_checksum=True, defs=FROM_JUICEBOX_FIELD_DEFS) -> None:
+    def __init__(self, has_checksum=True, defs={}) -> None:
         self.has_checksum = has_checksum
         self.payload_str = None
         self.checksum_str = None
@@ -302,7 +308,13 @@ class JuiceboxMessage:
 
 
 
-class JuiceboxEncryptedMessage(JuiceboxMessage):
+class JuiceboxStatusMessage(JuiceboxMessage):
+
+    def __init__(self, has_checksum=True, defs=FROM_JUICEBOX_FIELD_DEFS) -> None:
+        super().__init__(has_checksum=has_checksum, defs=defs)
+
+
+class JuiceboxEncryptedMessage(JuiceboxStatusMessage):
 
     
     def from_bytes(self, data : bytes):
@@ -325,7 +337,7 @@ class JuiceboxEncryptedMessage(JuiceboxMessage):
 class JuiceboxCommand(JuiceboxMessage):
 
     def __init__(self, previous=None, new_version=False) -> None:
-        super().__init__(defs={})
+        super().__init__()
         self.new_version = new_version
         self.command = 6 # Alternates between C242, C244, C008, C006. Meaning unclear.
         self.end_char = "$"
@@ -409,3 +421,27 @@ class JuiceboxCommand(JuiceboxMessage):
             self.values.pop("S")
             
         _LOGGER.info(f"parse_values values {self.values}")
+
+
+class JuiceboxDebugMessage(JuiceboxMessage):
+
+    def __init__(self) -> None:
+        super().__init__(has_checksum=False)
+
+    def from_string(self, string: str) -> 'JuiceboxMessage':
+        _LOGGER.info(f"from_string {string}")
+        msg = re.search(BASE_MESSAGE_PATTERN_NO_VERSION, string)
+        self.values = {}
+        self.values[FIELD_SERIAL] = msg.group(PATTERN_GROUP_SERIAL)
+#TODO split and convert level like _debug_message_parse
+        self.values["debug_message"] = msg.group(PATTERN_GROUP_DATA_PAYLOAD)
+        
+        return self
+        
+    def build_payload(self) -> None:
+        if self.payload_str:
+            return
+
+        self.payload_str = self.values[FIELD_SERIAL] + ':' + self.values["debug_message"]
+
+

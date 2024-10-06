@@ -4,6 +4,9 @@ from juicebox_exceptions import JuiceboxInvalidMessageFormat
 import codecs
 import datetime
 
+#
+# Some messages here are not the real one captured, the serial number of device was changed after doing tests with real values and checksum corrected
+#
 class TestMessage(unittest.TestCase):
 
     def do_test_message_building(self, new_version, offline_amperage, instant_amperage, full_command):
@@ -67,11 +70,11 @@ class TestMessage(unittest.TestCase):
         """
         Status messages are sent by the Juicebox
         """
-        raw_msg = "0910042001260513476122621631:v09u,s627,F10,u01254993,V2414,L00004555804,S01,T08,M0040,C0040,m0040,t29,i75,e00000,f5999,r61,b000,B0000000!55M:"
+        raw_msg = "0910000000000000000000000000:v09u,s627,F10,u01254993,V2414,L00004555804,S01,T08,M0040,C0040,m0040,t29,i75,e00000,f5999,r61,b000,B0000000!S1H:"
 
         m = juicebox_message_from_string(raw_msg)
-        self.assertEqual(m.payload_str, "0910042001260513476122621631:v09u,s627,F10,u01254993,V2414,L00004555804,S01,T08,M0040,C0040,m0040,t29,i75,e00000,f5999,r61,b000,B0000000")
-        self.assertEqual(m.checksum_str, "55M")
+        self.assertEqual(m.payload_str, "0910000000000000000000000000:v09u,s627,F10,u01254993,V2414,L00004555804,S01,T08,M0040,C0040,m0040,t29,i75,e00000,f5999,r61,b000,B0000000")
+        self.assertEqual(m.checksum_str, "S1H")
         self.assertEqual(m.checksum_str, m.checksum_computed())
         self.assertEqual(True, m.has_value("C"))
         self.assertEqual(m.get_value("C"), "0040")
@@ -80,7 +83,7 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_value("voltage"), "2414")
         self.assertEqual(m.get_processed_value("status"), "Plugged In")
         self.assertEqual(m.get_processed_value("voltage"), 241.4)
-        self.assertEqual(m.get_value("serial"), "0910042001260513476122621631")
+        self.assertEqual(m.get_value("serial"), "0910000000000000000000000000")
         self.assertEqual(True, m.has_value("L"))
         self.assertEqual(True, m.has_value("M"))
         self.assertEqual(m.build(), raw_msg)
@@ -218,6 +221,12 @@ class TestMessage(unittest.TestCase):
             self.V07_SAMPLE,
         ]
         
+        debug_messages = [
+            "0000000000000000000000000000:DBG,NFO:BOT:EMWERK-JB_1_1-1.4.0.28, 2021-04-27T20:39:50Z, ZentriOS-WZ-3.6.4.0:",
+            "0000000000000000000000000000:DBG,NFO:BOT:FW Init.ENC.Y/ECDAYS.90/EVT.Y/ECHTTP.Y:",
+            "0000000000000000000000000000:DBG,NFO:BOT:UUID 0000000000000000000000000000000000000000:",
+        ]
+        
         old_messages = [
             self.OLD_MESSAGE,
             self.OLD_MESSAGE_2,
@@ -225,7 +234,7 @@ class TestMessage(unittest.TestCase):
             self.OLD_CHARGING
         ]
 
-        for message in (cmd_messages + checksum_messages + old_messages):
+        for message in (cmd_messages + checksum_messages + old_messages + debug_messages):
             m = juicebox_message_from_string(message)
 
             self.assertEqual(m.build(), message)
