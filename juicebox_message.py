@@ -68,6 +68,9 @@ def process_current_max(message, value):
     
 # TODO add process to other messages to convert values
 
+# This keeps old behaviour, temperature comes in message as Celsius and are converted to Farenheit
+def process_temperature(message, value):
+    return round(float(value) * 1.8 + 32, 2)
 
 
 FROM_JUICEBOX_FIELD_DEFS = {
@@ -93,7 +96,7 @@ FROM_JUICEBOX_FIELD_DEFS = {
     # t - probably the report time in seconds - "every 9 seconds" (or may end up being 10).
     #   It can change its reporting interval if the bit mask in the reply command indicates that it should send reports faster (yet to be determined).
     "t" : { "alias" : "report_time" },
-    "T" : { "alias" : "temperature", "process" : process_int },
+    "T" : { "alias" : "temperature", "process" : process_temperature },
     "u" : { "alias" : "loop_counter" },
     "v" : { "alias" : "protocol_version" },
     "V" : { "alias" : "voltage", "process" : process_voltage },

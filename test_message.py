@@ -83,6 +83,8 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_value("voltage"), "2414")
         self.assertEqual(m.get_processed_value("status"), "Plugged In")
         self.assertEqual(m.get_processed_value("voltage"), 241.4)
+        self.assertEqual(m.get_value("temperature"), "08")
+        self.assertEqual(m.get_processed_value("temperature"), 46.4)
         self.assertEqual(m.get_value("serial"), "0910000000000000000000000000")
         self.assertEqual(True, m.has_value("L"))
         self.assertEqual(True, m.has_value("M"))
@@ -108,6 +110,8 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_value("serial"), self.FAKE_SERIAL)
         self.assertEqual(m.get_processed_value("status"), "Unplugged")
         self.assertEqual(m.get_processed_value("voltage"), 247)
+        self.assertEqual(m.get_value("temperature"), "34")
+        self.assertEqual(m.get_processed_value("temperature"), 93.2)
 
     def test_old_message_2(self):
         """
@@ -119,6 +123,8 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.checksum_str, None)
         self.assertEqual(m.get_value("serial"), self.FAKE_SERIAL)
         self.assertEqual(m.get_processed_value("status"), "Charging")
+        self.assertEqual(m.get_value("temperature"), "28")
+        self.assertEqual(m.get_processed_value("temperature"), 82.4)
         # the duplicate value is saved but what they mean ???
         self.assertEqual(m.get_value("E"), "13322")
         self.assertEqual(m.get_value("E:1"), "14")
@@ -135,6 +141,8 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_value("serial"), self.FAKE_SERIAL)
         self.assertEqual(m.get_processed_value("status"), "Charging")
         self.assertEqual(m.get_processed_value("voltage"), 247)
+        self.assertEqual(m.get_value("temperature"), "20")
+        self.assertEqual(m.get_processed_value("temperature"), 68.0)
         # the duplicate value is saved but what they mean ???
         self.assertEqual(m.get_value("E"), "60")
         self.assertEqual(m.get_value("E:1"), "14")
@@ -150,6 +158,8 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_value("serial"), self.FAKE_SERIAL)
         self.assertEqual(m.get_processed_value("status"), "Plugged In")
         self.assertEqual(m.get_processed_value("voltage"), 247)
+        self.assertEqual(m.get_value("temperature"), "20")
+        self.assertEqual(m.get_processed_value("temperature"), 68.0)
         # the duplicate value is saved but what they mean ???
         self.assertEqual(m.get_value("E"), "67")
         self.assertEqual(m.get_value("E:1"), "14")
@@ -178,6 +188,8 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_processed_value("energy_session"), 4501)
         self.assertEqual(m.get_processed_value("energy_lifetime"), 4262804)
         self.assertEqual(m.get_processed_value("interval"), 23)
+        self.assertEqual(m.get_value("temperature"), "28")
+        self.assertEqual(m.get_processed_value("temperature"), 82.4)
 
     def test_v07(self):
         """
@@ -197,6 +209,8 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_processed_value("energy_session"), 6804)
         self.assertEqual(m.get_processed_value("energy_lifetime"), 24880114)
         self.assertEqual(m.get_processed_value("interval"), 78)
+        self.assertEqual(m.get_value("temperature"), "62")
+        self.assertEqual(m.get_processed_value("temperature"), 143.6)
 
 
     
