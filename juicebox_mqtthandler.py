@@ -119,6 +119,7 @@ class JuiceboxMQTTSendingEntity(JuiceboxMQTTEntity):
     ):
         # _LOGGER.debug(f"SendingEntity Init: {name}")
         super().__init__(name, **kwargs)
+        self.command_timestamp = None
 
     async def start(self):
         entity_info_keys = getattr(
@@ -168,6 +169,7 @@ class JuiceboxMQTTSendingEntity(JuiceboxMQTTEntity):
             else:
                 # Internal state must be set before sending message to juicebox
                 await self.set(state)
+                self.command_timestamp = time.time()
                 await self._mitm_handler.send_cmd_message_to_juicebox(new_values=True)
         else:
             if self._add_error is not None:
@@ -540,7 +542,18 @@ class JuiceboxMQTTHandler:
         for k in message:
             entity = self._entities.get(k, None)
             if entity and (entity.experimental is False or self._experimental is True):
-                await entity.set_state(message.get(k, None))
+
+                # ignore if a new setting was defined in few seconds before
+                if isinstance(entity, JuiceboxMQTTSendingEntity) and entity.command_timestamp:
+                    elapsed = int(time.time() - entity.command_timestamp)
+                else:
+                    elapsed = 9999
+                    
+                if elapsed > 10:
+                    await entity.set_state(message.get(k, None))
+                else:
+                    _LOGGER.warning(f"ignoring {k} from juicebox device after update elapsed={elapsed}")
+                    
             attributes[k] = message.get(k, None)
         if (
             self._experimental
