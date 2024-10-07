@@ -166,7 +166,9 @@ class JuiceboxMITM:
 
             if self._ignore_enelx:
                 # Keep sending responses to local juicebox like the enelx servers using last values
-                await self.send_cmd_message_to_juicebox(new_values=False)
+                # the responses should be send only to JuiceboxStatusMessages
+                if isinstance(decoded_message, JuiceboxStatusMessage):
+                    await self.send_cmd_message_to_juicebox(new_values=False)
             else:
                 try:
                     await self.send_data(data, self._enelx_addr)
