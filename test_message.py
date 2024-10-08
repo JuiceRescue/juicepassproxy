@@ -9,8 +9,7 @@ import datetime
 #
 class TestMessage(unittest.TestCase):
 
-    @classmethod
-    def setUpModule(self):
+    def setUp(self):
         self.maxDiff = None
     
     def do_test_message_building(self, new_version, offline_amperage, instant_amperage, full_command):
@@ -117,7 +116,8 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_value("temperature"), "34")
         self.assertEqual(m.get_processed_value("temperature"), 93.2)
         # TODO complete other tests with this kind of assert 
-        self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 0, "serial" : self.FAKE_SERIAL, "status" : "Unplugged", "voltage": 247.0, "temperature" : 93.2, "energy_lifetime": 11097,  "energy_session": 14, "interval": 84,  "report_time": "30", "e" : "1"})
+        self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 0, "serial" : self.FAKE_SERIAL, "status" : "Unplugged", "voltage": 247.0, 
+            "temperature" : 93.2, "energy_lifetime": 11097,  "energy_session": 14, "interval": 84,  "report_time": "30", "e" : "1"})
 
     def test_old_message_2(self):
         """
@@ -220,7 +220,39 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_processed_value("interval"), 78)
         self.assertEqual(m.get_value("temperature"), "62")
         self.assertEqual(m.get_processed_value("temperature"), 143.6)
-        self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 39.4, "serial" : self.FAKE_SERIAL, "status" : "Charging", "voltage": 240.0, "temperature" : 143.6, "energy_lifetime": 24880114,  "energy_session": 6804, "interval": 78,  "report_time": "09", "e" : "-001", "frequency" : 60.01, "loop_counter": "30048", "protocol_version" : "07", "p" : "0992", "current_max_charging": 40, "current_rating": 40, "X" : "0", "Y" : "0", "counter" : "0001" })
+        self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 39.4, "serial" : self.FAKE_SERIAL, "status" : "Charging", "voltage": 240.0, 
+            "temperature" : 143.6, "energy_lifetime": 24880114,  "energy_session": 6804, "interval": 78, 
+            "report_time": "09", "e" : "-001", "frequency" : 60.01, "loop_counter": "30048", 
+            "protocol_version" : "07", "p" : "0992", "current_max_charging": 40, "current_rating": 40, 
+            "X" : "0", "Y" : "0", "counter" : "0001" })
+
+    def test_v07_2(self):
+        """
+        Test v07_2 sample message
+        """
+
+        m = juicebox_message_from_string(self.V07_SAMPLE_2)
+        chkidx = self.V07_SAMPLE_2.index('!')
+        self.assertEqual(m.payload_str, self.V07_SAMPLE_2[:chkidx])
+        self.assertEqual(m.crc_str, self.V07_SAMPLE_2[(chkidx+1):(chkidx+4)])
+        self.assertEqual(m.get_processed_value("status"), "Charging")
+        self.assertEqual(m.get_processed_value("voltage"), 242.2)
+        self.assertEqual(m.get_processed_value("frequency"), 60.01)
+        self.assertEqual(m.get_processed_value("current"), 39.3)
+        self.assertEqual(m.get_processed_value("current_rating"), 40)
+        self.assertEqual(m.get_processed_value("current_max_charging"), 40)
+        # The process will return value for this parameter that are not comming on the message
+        self.assertEqual(m.get_processed_value("current_max"), 40)
+        self.assertEqual(m.get_processed_value("energy_session"), 19146)
+        self.assertEqual(m.get_processed_value("energy_lifetime"), 24957914)
+        self.assertEqual(m.get_processed_value("interval"), 51)
+        self.assertEqual(m.get_value("temperature"), "61")
+        self.assertEqual(m.get_processed_value("temperature"), 141.8)
+        self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 39.3, "serial" : self.FAKE_SERIAL, "status" : "Charging", "voltage": 242.2, 
+            "temperature" : 141.8, "energy_lifetime": 24957914,  "energy_session": 19146, "interval": 51,  
+            "report_time": "09", "e" : "-001", "frequency" : 60.01, "loop_counter": "16708", 
+            "protocol_version" : "07", "p" : "0992", "current_max_charging": 40, "current_rating": 40, 
+            "X" : "0", "Y" : "0", "counter" : "0177" })
 
 
     DEBUG_BOT_VERSION = "0000000000000000000000000000:DBG,NFO:BOT:EMWERK-JB_1_1-1.4.0.28, 2021-04-27T20:39:50Z, ZentriOS-WZ-3.6.4.0:"

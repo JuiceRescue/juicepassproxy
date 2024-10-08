@@ -49,7 +49,7 @@ def process_voltage(message, value):
     if len(value) < 4:
         return float(value)
 
-    return float(value) * 0.1
+    return round(float(value) * 0.1, 1)
     
 def process_int(message, value):
 
@@ -76,17 +76,20 @@ def process_frequency(message, value):
     return round(float(value) * 0.01, 2)
 
 def process_current(message, value):
-    return round(float(value) * 0.1, 2)
+    return round(float(value) * 0.1, 1)
 
 
 FROM_JUICEBOX_FIELD_DEFS = {
-    # Undefined parts: F, e, r, b, B, P, p
-    # https://github.com/snicker/juicepassproxy/issues/52
+    # many of definitions came from https://github.com/snicker/juicepassproxy/issues/52
     "A" : { "alias" : "current", "process" : process_current },
+    # b ?
+    # B ?
     # max current to be used when offline
     "C" : { "alias" : "current_max", "process" : process_current_max },
+    # e ? variable positive/negative/zero values
     "E" : { "alias" : "energy_session", "process" : process_int  },
     "f" : { "alias" : "frequency", "process" : process_frequency  },
+    # F ?
     # i = Interval number. It contains a 96-slot interval memory (15-minute x 24-hour cycle) and
     #   this tells you how much energy was consumed in the rolling window as it reports one past
     #   (or current, if it's reporting the "right-now" interval) interval per message.
@@ -97,6 +100,9 @@ FROM_JUICEBOX_FIELD_DEFS = {
     # the max current to be used during charging
     "M" : { "alias" : "current_max_charging", "process" : process_int },
     "L" : { "alias" : "energy_lifetime", "process" : process_int },
+    # p ?
+    # P ? v09u - does not came when car is unplugged and appear to be allways 0
+    # r ? v09u - appear to be fixed to 995 in one device
     "s" : { "alias" : "counter" },
     "S" : { "alias" : "status", "process" : process_status },
     # t - probably the report time in seconds - "every 9 seconds" (or may end up being 10).
@@ -106,6 +112,8 @@ FROM_JUICEBOX_FIELD_DEFS = {
     "u" : { "alias" : "loop_counter" },
     "v" : { "alias" : "protocol_version" },
     "V" : { "alias" : "voltage", "process" : process_voltage },
+    # X ?
+    # Y ?
     }
 
 
@@ -475,6 +483,7 @@ class JuiceboxDebugMessage(JuiceboxMessage):
 
         debug_msg = re.sub('^DBG,','',msg.group(PATTERN_GROUP_DATA_PAYLOAD))
 
+        # Change abbreviated to full log level like old code
         dbg_level_abbr = debug_msg[:4]
         if dbg_level_abbr == "NFO:":
             dbg_level = "INFO"
