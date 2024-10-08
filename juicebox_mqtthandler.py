@@ -544,6 +544,8 @@ class JuiceboxMQTTHandler:
             if entity and (entity.experimental is False or self._experimental is True):
 
                 # ignore if a new setting was defined in few seconds before
+                # this is necessary because the same entity is used to get the value from device and to set configuration
+                # This makes simple to user, but can create some inconsistencies
                 if isinstance(entity, JuiceboxMQTTSendingEntity) and entity.command_timestamp:
                     elapsed = int(time.time() - entity.command_timestamp)
                 else:
@@ -615,7 +617,9 @@ class JuiceboxMQTTHandler:
                 message = await self._debug_message_parse(data)
             else:
                 message = await self._basic_message_parse(data)
-                
+        
+            _LOGGER.debug(f"decode/parsed message = {message}")
+            
             if message:
                 await self._basic_message_publish(message)
             return data

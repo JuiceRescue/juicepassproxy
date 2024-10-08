@@ -72,15 +72,21 @@ def process_current_max(message, value):
 def process_temperature(message, value):
     return round(float(value) * 1.8 + 32, 2)
 
+def process_frequency(message, value):
+    return round(float(value) * 0.01, 2)
+
+def process_current(message, value):
+    return round(float(value) * 0.1, 2)
+
 
 FROM_JUICEBOX_FIELD_DEFS = {
     # Undefined parts: F, e, r, b, B, P, p
     # https://github.com/snicker/juicepassproxy/issues/52
-    "A" : { "alias" : "current", "process" : process_float },
+    "A" : { "alias" : "current", "process" : process_current },
     # max current to be used when offline
     "C" : { "alias" : "current_max", "process" : process_current_max },
     "E" : { "alias" : "energy_session", "process" : process_int  },
-    "f" : { "alias" : "frequency" },
+    "f" : { "alias" : "frequency", "process" : process_frequency  },
     # i = Interval number. It contains a 96-slot interval memory (15-minute x 24-hour cycle) and
     #   this tells you how much energy was consumed in the rolling window as it reports one past
     #   (or current, if it's reporting the "right-now" interval) interval per message.
@@ -457,14 +463,28 @@ class JuiceboxDebugMessage(JuiceboxMessage):
 
     def from_string(self, string: str) -> 'JuiceboxMessage':
         _LOGGER.info(f"from_string {string}")
+        #TODO use better regex to remove this end_char on pattern match
+        if string.endswith(self.end_char):
+            string = string[:-1]
+            
+        self.payload_str = string
+        
         msg = re.search(BASE_MESSAGE_PATTERN_NO_VERSION, string)
         self.values = { "type" : "debug" }
         self.values[FIELD_SERIAL] = msg.group(PATTERN_GROUP_SERIAL)
-#TODO split and convert level like _debug_message_parse
-        self.values["debug_message"] = msg.group(PATTERN_GROUP_DATA_PAYLOAD)
-        #TODO use better regex to remove this end_char on pattern match
-        if self.values["debug_message"].endswith(self.end_char):
-           self.values["debug_message"] = self.values["debug_message"][:-1]
+
+        debug_msg = re.sub('^DBG,','',msg.group(PATTERN_GROUP_DATA_PAYLOAD))
+
+        dbg_level_abbr = debug_msg[:4]
+        if dbg_level_abbr == "NFO:":
+            dbg_level = "INFO"
+        elif dbg_level_abbr == "WRN:":
+            dbg_level = "WARNING"
+        elif dbg_level_abbr == "ERR:":
+            dbg_level = "ERROR"
+        else:
+            dbg_level = dbg_level_abbr
+        self.values["debug_message"] = dbg_level + ": " + debug_msg[4:]
         
         
         return self
@@ -473,7 +493,7 @@ class JuiceboxDebugMessage(JuiceboxMessage):
         if self.payload_str:
             return
 
-        self.payload_str = self.values[FIELD_SERIAL] + ':' + self.values["debug_message"]
+        self.payload_str = self.values[FIELD_SERIAL] + ':' + 'DBG,' + self.values["debug_message"]
 
 
     # Generate data like old processing

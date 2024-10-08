@@ -1,5 +1,5 @@
 import unittest
-from juicebox_message import juicebox_message_from_string, juicebox_message_from_bytes, JuiceboxMessage, JuiceboxEncryptedMessage, JuiceboxCommand
+from juicebox_message import juicebox_message_from_string, juicebox_message_from_bytes, JuiceboxMessage, JuiceboxDebugMessage, JuiceboxEncryptedMessage, JuiceboxCommand
 from juicebox_exceptions import JuiceboxInvalidMessageFormat
 import codecs
 import datetime
@@ -9,6 +9,10 @@ import datetime
 #
 class TestMessage(unittest.TestCase):
 
+    @classmethod
+    def setUpModule(self):
+        self.maxDiff = None
+    
     def do_test_message_building(self, new_version, offline_amperage, instant_amperage, full_command):
         m = JuiceboxCommand(new_version=new_version)
         m.time = datetime.datetime(2012, 3, 23, 23, 24, 55, 173504)
@@ -168,10 +172,11 @@ class TestMessage(unittest.TestCase):
 
 
     # Original messages changed to remove real serial number
-    V09U_SAMPLE = '0910000000000000000000000000:v09u,s001,F31,u00412974,V1366,L00004262804,S02,T28,M0024,C0024,m0032,t09,i23,e-0001,f5990,r99,b000,B0000000,P0,E0004501,A00161,p0996!ZW5:';
+    V09U_SAMPLE =  '0910000000000000000000000000:v09u,s001,F31,u00412974,V1366,L00004262804,S02,T28,M0024,C0024,m0032,t09,i23,e-0001,f5990,r99,b000,B0000000,P0,E0004501,A00161,p0996!ZW5:';
     # from https://github.com/snicker/juicepassproxy/issues/90
-    V07_SAMPLE = '0000000000000000000000000000:v07,s0001,u30048,V2400,L0024880114,S2,T62,M40,m40,t09,i78,e-001,f6001,X0,Y0,E006804,A0394,p0992!MF8:';
-
+    V07_SAMPLE  =  '0910000000000000000000000000:v07,s0001,u30048,V2400,L0024880114,S2,T62,M40,m40,t09,i78,e-001,f6001,X0,Y0,E006804,A0394,p0992!KKD:';
+    # from discord channel
+    V07_SAMPLE_2 = '0910000000000000000000000000:v07,s0177,u16708,V2422,L0024957914,S2,T61,M40,m40,t09,i51,e-001,f6001,X0,Y0,E019146,A0393,p0992!QBJ:'
 
     def test_v09(self):
         """
@@ -204,6 +209,8 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.crc_str, self.V07_SAMPLE[(chkidx+1):(chkidx+4)])
         self.assertEqual(m.get_processed_value("status"), "Charging")
         self.assertEqual(m.get_processed_value("voltage"), 240.0)
+        self.assertEqual(m.get_processed_value("frequency"), 60.01)
+        self.assertEqual(m.get_processed_value("current"), 39.4)
         self.assertEqual(m.get_processed_value("current_rating"), 40)
         self.assertEqual(m.get_processed_value("current_max_charging"), 40)
         # The process will return value for this parameter that are not comming on the message
@@ -213,9 +220,16 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_processed_value("interval"), 78)
         self.assertEqual(m.get_value("temperature"), "62")
         self.assertEqual(m.get_processed_value("temperature"), 143.6)
+        self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 39.4, "serial" : self.FAKE_SERIAL, "status" : "Charging", "voltage": 240.0, "temperature" : 143.6, "energy_lifetime": 24880114,  "energy_session": 6804, "interval": 78,  "report_time": "09", "e" : "-001", "frequency" : 60.01, "loop_counter": "30048", "protocol_version" : "07", "p" : "0992", "current_max_charging": 40, "current_rating": 40, "X" : "0", "Y" : "0", "counter" : "0001" })
 
 
-    
+    DEBUG_BOT_VERSION = "0000000000000000000000000000:DBG,NFO:BOT:EMWERK-JB_1_1-1.4.0.28, 2021-04-27T20:39:50Z, ZentriOS-WZ-3.6.4.0:"
+
+    def test_debug_BOT_VERSION(self):
+        m = juicebox_message_from_string(self.DEBUG_BOT_VERSION)
+        self.assertTrue(isinstance(m, JuiceboxDebugMessage))
+        self.assertEqual(m.get_value("debug_message"),"INFO: BOT:EMWERK-JB_1_1-1.4.0.28, 2021-04-27T20:39:50Z, ZentriOS-WZ-3.6.4.0")
+            
     def test_message_crcs(self):
         cmd_messages = [
             'CMD41325A0040M040C006S638!5N5$', # @MrDrew514 (v09u)
@@ -241,14 +255,14 @@ class TestMessage(unittest.TestCase):
         crc_messages = [
             self.V09U_SAMPLE,
             self.V07_SAMPLE,
+            self.V07_SAMPLE_2,
         ]
         
         debug_messages = [
-            "0000000000000000000000000000:DBG,NFO:BOT:EMWERK-JB_1_1-1.4.0.28, 2021-04-27T20:39:50Z, ZentriOS-WZ-3.6.4.0:",
+            self.DEBUG_BOT_VERSION,
             "0000000000000000000000000000:DBG,NFO:BOT:FW Init.ENC.Y/ECDAYS.90/EVT.Y/ECHTTP.Y:",
             "0000000000000000000000000000:DBG,NFO:BOT:UUID 0000000000000000000000000000000000000000:",
             "0000000000000000000000000000:DBG,NFO:BOT:BT:BootLoader(0), OTA(3), crc(ffffffff):",
-            "0000000000000000000000000000:DBG,NFO:BOT:UUID 0000000000000000000000000000000000000000:",
             "0000000000000000000000000000:DBG,ERR:Miss CRC 'CMD01216A27M30C006S23':",
             "0000000000000000000000000000:DBG,WRN:Events_03_04e22Z-01-01 Open Err 7034:",
             "0000000000000000000000000000:DBG,NFO:ELife [-1,-1,5340542], 2, w 5340542, r 5340542,5340543:",
