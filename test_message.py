@@ -93,7 +93,6 @@ class TestMessage(unittest.TestCase):
 
     FAKE_SERIAL = "0910000000000000000000000000"
     # https://github.com/snicker/juicepassproxy/issues/80
-    # real serial removed as not used by any check
     OLD_MESSAGE = '0910000000000000000000000000:V247,L11097,S0,T34,E14,i84,e1,t30:'
     OLD_MESSAGE_2 = '0910000000000000000000000000:V247,L11156,E13322,A138,T28,t10,E14,i41,e1:'
     OLD_CHARGING = '0910000000000000000000000000:V247,L11097,E60,A137,T20,t10,E14,i94,e2:'
@@ -259,6 +258,8 @@ class TestMessage(unittest.TestCase):
         m = juicebox_message_from_string(self.DEBUG_BOT_VERSION)
         self.assertTrue(isinstance(m, JuiceboxDebugMessage))
         self.assertEqual(m.get_value("debug_message"),"INFO: BOT:EMWERK-JB_1_1-1.4.0.28, 2021-04-27T20:39:50Z, ZentriOS-WZ-3.6.4.0")
+        self.assertTrue(m.is_boot())
+
             
     def test_message_crcs(self):
         cmd_messages = [

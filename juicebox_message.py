@@ -487,10 +487,14 @@ class JuiceboxDebugMessage(JuiceboxMessage):
             dbg_level = "ERROR"
         else:
             dbg_level = dbg_level_abbr
-        self.values["debug_message"] = dbg_level + ": " + debug_msg[4:]
-        
-        
+        debug_msg_text = debug_msg[4:]
+        self.values["debug_message"] = dbg_level + ": " + debug_msg_text
+        self.values["boot"] = debug_msg_text.startswith("BOT:")
+               
         return self
+        
+    def is_boot(self):
+        return ("boot" in self.values) and (self.values["boot"])
         
     def build_payload(self) -> None:
         if self.payload_str:

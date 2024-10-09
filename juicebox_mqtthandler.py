@@ -390,23 +390,25 @@ class JuiceboxMQTTHandler:
             ),
             "debug_message": JuiceboxMQTTSensor(
                 name="Last Debug Message",
-                # expire_after=60,
                 enabled_by_default=False,
                 icon="mdi:bug",
                 entity_category="diagnostic",
                 initial_state=f"INFO: Starting JuicePass Proxy {VERSION}",
+                expire_after=0, # Keep last message available
             ),
             "data_from_juicebox": JuiceboxMQTTSensor(
                 name="Data from JuiceBox",
                 experimental=True,
                 enabled_by_default=False,
                 entity_category="diagnostic",
+                expire_after=0, # Keep last message available
             ),
             "data_from_enelx": JuiceboxMQTTSensor(
                 name="Data from EnelX",
                 experimental=True,
                 enabled_by_default=False,
                 entity_category="diagnostic",
+                expire_after=0, # Keep last message available
             ),
             "send_to_juicebox": JuiceboxMQTTText(
                 name="Send Command to JuiceBox",
