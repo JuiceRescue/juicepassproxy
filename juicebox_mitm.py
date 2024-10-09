@@ -12,7 +12,7 @@ from const import (
     MITM_RECV_TIMEOUT,
     MITM_SEND_DATA_TIMEOUT,
 )
-from juicebox_message import JuiceboxCommand, JuiceboxStatusMessage, JuiceboxEncryptedMessage, juicebox_message_from_bytes
+from juicebox_message import JuiceboxCommand, JuiceboxStatusMessage, JuiceboxEncryptedMessage, JuiceboxDebugMessage, juicebox_message_from_bytes
 
 # Began with https://github.com/rsc-dev/pyproxy and rewrote when moving to async.
 
@@ -51,6 +51,7 @@ class JuiceboxMITM:
         # Last message received from juicebox device
         self._last_status_message = None
         self._first_status_message_timestamp = None
+        self._boot_timestamp = None
 
     async def start(self) -> None:
         _LOGGER.info("Starting JuiceboxMITM")
@@ -144,6 +145,53 @@ class JuiceboxMITM:
             f"{ERROR_LOOKBACK_MIN} min."
         )
 
+
+    def _booted_in_less_than(self, seconds):
+        return self._boot_timestamp and ((time.time() - self._boot_timestamp) < seconds)
+            
+    async def _message_decode(self, data : bytes):
+        decoded_message = None
+        try:
+            decoded_message = juicebox_message_from_bytes(data)
+            if isinstance(decoded_message, JuiceboxStatusMessage):
+                self._last_status_message = decoded_message
+                if self._first_status_message_timestamp is None:
+                   self._first_status_message_timestamp = time.time()
+                elapsed = int(time.time() - self._first_status_message_timestamp)
+
+                # Try to initialize the set entities with safe values from the juicebox device
+                # This is not the best way to do, but can be made without need to store somewhere the data as config is not available here
+                # TODO: better/safer way
+                if not self.is_mqtt_numeric_entity_defined("current_max_online_set"):
+                    if decoded_message.has_value("current_max_online"):
+                        _LOGGER.info("setting current_max_online_set with current_max_online")
+                        await self._mqtt_handler.get_entity("current_max_online_set").set_state(self._last_status_message.get_processed_value("current_max_online"))
+                    # Apparently all messages came with current_max_online then, this code will never be executed                            
+                    elif ((elapsed > 600) or self._booted_in_less_than(30)) and decoded_message.has_value("current_rating"):
+                        _LOGGER.info("setting current_max_online_set with current_rating")
+                        await self._mqtt_handler.get_entity("current_max_online_set").set_state(self._last_status_message.get_processed_value("current_rating"))
+
+                if not self.is_mqtt_numeric_entity_defined("current_max_offline_set"): 
+                    if decoded_message.has_value("current_max_offline"):
+                        _LOGGER.info("setting current_max_offline_set with current_max_offline")
+                        await self._mqtt_handler.get_entity("current_max_offline_set").set_state(self._last_status_message.get_processed_value("current_max_offline"))
+                    # After a reboot of device, the device that does not send offline will start with online value defined with offline setting                            
+                    elif self._booted_in_less_than(30) and decoded_message.has_value("current_max_online"):
+                        _LOGGER.info("setting current_max_offline_set with current_max_online after reboot")
+                        await self._mqtt_handler.get_entity("current_max_online_set").set_state(self._last_status_message.get_processed_value("current_max_online"))
+                    elif ((elapsed > 600) or self._booted_in_less_than(30)) and decoded_message.has_value("current_rating"):
+                        _LOGGER.info("setting current_max_offline_set with current_rating")
+                        await self._mqtt_handler.get_entity("current_max_online_set").set_state(self._last_status_message.get_processed_value("current_rating"))
+                            
+            elif isinstance(decoded_message, JuiceboxDebugMessage):
+                if decoded_message.is_boot():
+                    self._boot_timestamp = time.time()
+          
+        except Exception as e:
+            _LOGGER.exception(f"Not a valid juicebox message |{data}| {e}")
+        
+        return decoded_message
+    
     async def _main_mitm_handler(self, data: bytes, from_addr: tuple[str, int]):
         if data is None or from_addr is None:
             return
@@ -154,37 +202,14 @@ class JuiceboxMITM:
 
         if from_addr == self._juicebox_addr:
             # Must decode message to give correct command response based on version
-            # Also this decoded message can be passed to the mqtt handler to skip a new decoding
-            decoded_message = None
-            try:
-                decoded_message = juicebox_message_from_bytes(data)
-                if isinstance(decoded_message, JuiceboxStatusMessage):
-                    self._last_status_message = decoded_message
-                    if self._first_status_message_timestamp is None:
-                       self._first_status_message_timestamp = time.time()
-                    elapsed = int(time.time() - self._first_status_message_timestamp)
-
-                    # Try to initialize the set entities with safe values from the juicebox device
-                    if not self.is_mqtt_numeric_entity_defined("current_max_online_set"):
-                        if decoded_message.has_value("current_max_online"):
-                            await self._mqtt_handler.get_entity("current_max_online_set").set_state(self._last_status_message.get_processed_value("current_max_online"))
-                        if (elapsed > 600) and decoded_message.has_value("current_rating"):
-                            await self._mqtt_handler.get_entity("current_max_online_set").set_state(self._last_status_message.get_processed_value("current_rating"))
-
-                    if not self.is_mqtt_numeric_entity_defined("current_max_offline_set"): 
-                        if decoded_message.has_value("current_max_offline"):
-                            await self._mqtt_handler.get_entity("current_max_offline_set").set_state(self._last_status_message.get_processed_value("current_max_offline"))
-                        if (elapsed > 600) and decoded_message.has_value("current_rating"):
-                            await self._mqtt_handler.get_entity("current_max_online_set").set_state(self._last_status_message.get_processed_value("current_rating"))
-
-            except Exception as e:
-                _LOGGER.exception(f"Not a valid juicebox message |{data}| {e}")
+            # Also this decoded message can will passed to the mqtt handler to skip a new decoding
+            decoded_message = await self._message_decode(data)
 
             data = await self._local_mitm_handler(data, decoded_message)
 
             if self._ignore_enelx:
                 # Keep sending responses to local juicebox like the enelx servers using last values
-                # the responses should be send only to JuiceboxStatusMessages
+                # the responses should be send only to valid JuiceboxStatusMessages
                 if isinstance(decoded_message, JuiceboxStatusMessage):
                     await self.send_cmd_message_to_juicebox(new_values=False)
             else:
