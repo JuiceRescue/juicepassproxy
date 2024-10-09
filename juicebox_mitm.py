@@ -50,6 +50,7 @@ class JuiceboxMITM:
         self._last_command = None
         # Last message received from juicebox device
         self._last_status_message = None
+        self._first_status_message_timestamp = None
 
     async def start(self) -> None:
         _LOGGER.info("Starting JuiceboxMITM")
@@ -159,6 +160,23 @@ class JuiceboxMITM:
                 decoded_message = juicebox_message_from_bytes(data)
                 if isinstance(decoded_message, JuiceboxStatusMessage):
                     self._last_status_message = decoded_message
+                    if self._first_status_message_timestamp is None:
+                       self._first_status_message_timestamp = time.time()
+                    elapsed = int(time.time() - self._first_status_message_timestamp)
+
+                    # Try to initialize the set entities with safe values from the juicebox device
+                    if not self.is_mqtt_numeric_entity_defined("current_max_online_set"):
+                        if decoded_message.has_value("current_max_online"):
+                            await self._mqtt_handler.get_entity("current_max_online_set").set_state(self._last_status_message.get_processed_value("current_max_online"))
+                        if (elapsed > 600) and decoded_message.has_value("current_rating"):
+                            await self._mqtt_handler.get_entity("current_max_online_set").set_state(self._last_status_message.get_processed_value("current_rating"))
+
+                    if not self.is_mqtt_numeric_entity_defined("current_max_offline_set"): 
+                        if decoded_message.has_value("current_max_offline"):
+                            await self._mqtt_handler.get_entity("current_max_offline_set").set_state(self._last_status_message.get_processed_value("current_max_offline"))
+                        if (elapsed > 600) and decoded_message.has_value("current_rating"):
+                            await self._mqtt_handler.get_entity("current_max_online_set").set_state(self._last_status_message.get_processed_value("current_rating"))
+
             except Exception as e:
                 _LOGGER.exception(f"Not a valid juicebox message |{data}| {e}")
 
@@ -258,7 +276,7 @@ class JuiceboxMITM:
 
         return defined
         
-    def __build_cmd_message(self, new_values):
+    async def __build_cmd_message(self, new_values):
        
        if type(self._last_status_message) is JuiceboxEncryptedMessage:
           _LOGGER.info("Responses for encrypted protocol not supported yet")
@@ -275,12 +293,14 @@ class JuiceboxMITM:
           new_values = True
           
        if new_values:
-           if self.is_mqtt_numeric_entity_defined("current_max"):
-               message.offline_amperage = int(self._mqtt_handler.get_entity("current_max").state)
+           if (not self.is_mqtt_numeric_entity_defined("current_max_offline_set")) or (not self.is_mqtt_numeric_entity_defined("current_max_online_set")):
+              _LOGGER.error("Must have both current_max(online|offline) defined to send command message")
 
-           if self.is_mqtt_numeric_entity_defined("current_max_charging"):
-               message.instant_amperage = int(self._mqtt_handler.get_entity("current_max_charging").state)
+              return None
 
+           message.offline_amperage = int(self._mqtt_handler.get_entity("current_max_offline_set").state)
+           message.instant_amperage = int(self._mqtt_handler.get_entity("current_max_online_set").state)
+           
        _LOGGER.info(f"command message = {message} new_values={new_values} new_version={new_version}")
 
        self._last_command = message;
@@ -291,7 +311,7 @@ class JuiceboxMITM:
        
        if self._mqtt_handler.get_entity("act_as_server").is_on():
 
-          cmd_message = self.__build_cmd_message(new_values)
+          cmd_message = await self.__build_cmd_message(new_values)
           if cmd_message:
               _LOGGER.info(f"Sending command to juicebox {cmd_message} new_values={new_values}")
               await self.send_data(cmd_message.encode('utf-8'), self._juicebox_addr)

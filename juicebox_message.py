@@ -63,9 +63,9 @@ def process_float(message, value):
 def process_current_max(message, value):
     if value:
         return int(value)
-    else:
-        return message.get_processed_value("current_rating");
-    
+#    else:
+#        return message.get_processed_value("current_rating");
+        return None    
 # TODO add process to other messages to convert values
 
 # This keeps old behaviour, temperature comes in message as Celsius and are converted to Farenheit
@@ -85,7 +85,7 @@ FROM_JUICEBOX_FIELD_DEFS = {
     # b ?
     # B ?
     # max current to be used when offline
-    "C" : { "alias" : "current_max", "process" : process_current_max },
+    "C" : { "alias" : "current_max_offline", "process" : process_current_max },
     # e ? variable positive/negative/zero values
     "E" : { "alias" : "energy_session", "process" : process_int  },
     "f" : { "alias" : "frequency", "process" : process_frequency  },
@@ -97,8 +97,8 @@ FROM_JUICEBOX_FIELD_DEFS = {
     "i" : { "alias" : "interval", "process" : process_int },
     # indicates the hardware limit
     "m" : { "alias" : "current_rating", "process" : process_int },
-    # the max current to be used during charging
-    "M" : { "alias" : "current_max_charging", "process" : process_int },
+    # the max current to be used when connected to server
+    "M" : { "alias" : "current_max_online", "process" : process_int },
     "L" : { "alias" : "energy_lifetime", "process" : process_int },
     # p ?
     # P ? v09u - does not came when car is unplugged and appear to be allways 0
@@ -425,15 +425,9 @@ class JuiceboxCommand(JuiceboxMessage):
         #   @FalconFour definition of currents
         # Not sending undefined values 
         if self.new_version:
-            if self.instant_amperage:
-                self.payload_str += f"A{self.instant_amperage:04d}"
-            if self.offline_amperage:
-                self.payload_str += f"M{self.offline_amperage:03d}"
+            self.payload_str += f"A{self.instant_amperage:04d}M{self.offline_amperage:03d}"
         else:
-            if self.instant_amperage:
-                self.payload_str += f"A{self.instant_amperage:02d}"
-            if self.offline_amperage:
-                self.payload_str += f"M{self.offline_amperage:02d}"
+            self.payload_str += f"A{self.instant_amperage:02d}M{self.offline_amperage:02d}"
         self.payload_str += f"C{self.command:03d}S{self.counter:03d}"
         self.crc_str = self.crc_computed()
 

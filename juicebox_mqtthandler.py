@@ -281,77 +281,104 @@ class JuiceboxMQTTHandler:
             sw_version=VERSION,
             via_device="JuicePass Proxy",
         )
+
         self._entities = {
             "status": JuiceboxMQTTSensor(
                 name="Status",
                 icon="mdi:ev-station",
+                expire_after=7200,
             ),
             "current": JuiceboxMQTTSensor(
                 name="Current",
                 state_class="measurement",
                 device_class="current",
                 unit_of_measurement="A",
+                expire_after=7200,
             ),
             # Maximum supported by device
             "current_rating": JuiceboxMQTTSensor(
                 name="Current Rating",
+                device_class="current",
+                unit_of_measurement="A",
+                expire_after=7200,
+            ),
+            # Offline max 
+            "current_max_offline": JuiceboxMQTTSensor(
+                name="Max Current(Offline/Device)",
                 state_class="measurement",
                 device_class="current",
                 unit_of_measurement="A",
+                expire_after=7200,
             ),
-            # Offline max 
-            "current_max": JuiceboxMQTTNumber(
-                name="Max Current",
+            "current_max_offline_set": JuiceboxMQTTNumber(
+                name="Max Current(Offline/Wanted)",
                 device_class="current",
                 unit_of_measurement="A",
                 min=0,
                 max=self._max_current,
                 # no initial state, to use the value that will be received from juicebox
+                # because of this, the entity will only show later (first time) on homeassistant when value is set
+                # and can change the homeassistant value
             ),
             # Instant / Charging current
-            "current_max_charging": JuiceboxMQTTNumber(
-                name="Max Charging Current",
+            "current_max_online": JuiceboxMQTTSensor(
+                name="Max Current(Online/Device)",
+                state_class="measurement",
+                device_class="current",
+                unit_of_measurement="A",
+                expire_after=7200,
+            ),
+            "current_max_online_set": JuiceboxMQTTNumber(
+                name="Max Current(Online/Wanted)",
                 device_class="current",
                 unit_of_measurement="A",
                 min=0,
                 max=self._max_current,
                 # no initial state, to use the value that will be received from juicebox
+                # because of this, the entity will only show later (first time) on homeassistant when value is set
+                # and can change the homeassistant value
             ),
             "frequency": JuiceboxMQTTSensor(
                 name="Frequency",
                 state_class="measurement",
                 device_class="frequency",
                 unit_of_measurement="Hz",
+                expire_after=7200,
             ),
             "energy_lifetime": JuiceboxMQTTSensor(
                 name="Energy (Lifetime)",
                 state_class="total_increasing",
                 device_class="energy",
                 unit_of_measurement="Wh",
+                expire_after=7200,
             ),
             "energy_session": JuiceboxMQTTSensor(
                 name="Energy (Session)",
                 state_class="total_increasing",
                 device_class="energy",
                 unit_of_measurement="Wh",
+                expire_after=7200,
             ),
             "temperature": JuiceboxMQTTSensor(
                 name="Temperature",
                 state_class="measurement",
                 device_class="temperature",
                 unit_of_measurement="°F",
+                expire_after=7200,
             ),
             "voltage": JuiceboxMQTTSensor(
                 name="Voltage",
                 state_class="measurement",
                 device_class="voltage",
                 unit_of_measurement="V",
+                expire_after=7200,
             ),
             "power": JuiceboxMQTTSensor(
                 name="Power",
                 state_class="measurement",
                 device_class="power",
                 unit_of_measurement="W",
+                expire_after=7200,
             ),
             # Make possible to control from HA when juicepassproxy will act as ENEL X server for the juicebox
             # Will only work when ignoring ENEL X server
@@ -456,9 +483,9 @@ class JuiceboxMQTTHandler:
             elif part[0] == "m":
                 message["current_rating"] = float(part.split("m")[1])
             elif part[0] == "C":
-                message["current_max"] = float(part.split("C")[1])
+                message["current_max_offline"] = float(part.split("C")[1])
             elif part[0] == "M":
-                message["current_max_charging"] = float(part.split("M")[1])
+                message["current_max_online"] = float(part.split("M")[1])
             elif part[0] == "f":
                 message["frequency"] = round(float(part.split("f")[1]) * 0.01, 2)
             elif part[0] == "L":
@@ -488,15 +515,6 @@ class JuiceboxMQTTHandler:
         message["power"] = round(
             message.get("voltage", 0) * message.get("current", 0), 2
         )
-
-        # for v07 messages that came with m and M but no C parameter lets assume the min received value
-        if not "current_max" in message:
-            if ("current_rating" in message) and ("current_max_charging" in message):
-                message["current_max"] = min(message["current_rating"], message["current_max_charging"])
-            elif ("current_rating" in message): 
-                message["current_max"] = message["current_rating"]
-            elif ("current_max_charging" in message): 
-                message["current_max"] = message["current_max_charging"]
 
         message["data_from_juicebox"] = data.decode("utf-8")
         return message

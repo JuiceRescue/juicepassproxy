@@ -20,15 +20,13 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.build(), full_command)
     
     def test_message_building(self):
+        self.do_test_message_building(False, 0, 0, "CMD52324A00M00C006S001!SHP$")
         self.do_test_message_building(False, 16, 20, "CMD52324A20M16C006S001!5RE$")
-        self.do_test_message_building(False, None, 20, "CMD52324A20C006S001!NVK$")
-        self.do_test_message_building(False, 16, None, "CMD52324M16C006S001!BHS$")
 
 
     def test_message_building_new(self):
+        self.do_test_message_building(True, 0, 0, "CMD52324A0000M000C006S001!ETK$")
         self.do_test_message_building(True, 16, 20, "CMD52324A0020M016C006S001!YUK$")
-        self.do_test_message_building(True, None, 20, "CMD52324A0020C006S001!NJ5$")
-        self.do_test_message_building(True, 16, None, "CMD52324M016C006S001!SV9$")
 
 
     def test_entrypted_message(self):
@@ -190,8 +188,8 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_processed_value("status"), "Charging")
         self.assertEqual(m.get_processed_value("voltage"), 136.6)
         self.assertEqual(m.get_processed_value("current_rating"), 32)
-        self.assertEqual(m.get_processed_value("current_max_charging"), 24)
-        self.assertEqual(m.get_processed_value("current_max"), 24)
+        self.assertEqual(m.get_processed_value("current_max_online"), 24)
+        self.assertEqual(m.get_processed_value("current_max_offline"), 24)
         self.assertEqual(m.get_processed_value("energy_session"), 4501)
         self.assertEqual(m.get_processed_value("energy_lifetime"), 4262804)
         self.assertEqual(m.get_processed_value("interval"), 23)
@@ -212,9 +210,9 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_processed_value("frequency"), 60.01)
         self.assertEqual(m.get_processed_value("current"), 39.4)
         self.assertEqual(m.get_processed_value("current_rating"), 40)
-        self.assertEqual(m.get_processed_value("current_max_charging"), 40)
+        self.assertEqual(m.get_processed_value("current_max_online"), 40)
         # The process will return value for this parameter that are not comming on the message
-        self.assertEqual(m.get_processed_value("current_max"), 40)
+        self.assertEqual(m.get_processed_value("current_max_offline"), None)
         self.assertEqual(m.get_processed_value("energy_session"), 6804)
         self.assertEqual(m.get_processed_value("energy_lifetime"), 24880114)
         self.assertEqual(m.get_processed_value("interval"), 78)
@@ -223,7 +221,7 @@ class TestMessage(unittest.TestCase):
         self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 39.4, "serial" : self.FAKE_SERIAL, "status" : "Charging", "voltage": 240.0, 
             "temperature" : 143.6, "energy_lifetime": 24880114,  "energy_session": 6804, "interval": 78, 
             "report_time": "09", "e" : "-001", "frequency" : 60.01, "loop_counter": "30048", 
-            "protocol_version" : "07", "p" : "0992", "current_max_charging": 40, "current_rating": 40, 
+            "protocol_version" : "07", "p" : "0992", "current_max_online": 40, "current_rating": 40, 
             "X" : "0", "Y" : "0", "counter" : "0001" })
 
     def test_v07_2(self):
@@ -240,9 +238,9 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_processed_value("frequency"), 60.01)
         self.assertEqual(m.get_processed_value("current"), 39.3)
         self.assertEqual(m.get_processed_value("current_rating"), 40)
-        self.assertEqual(m.get_processed_value("current_max_charging"), 40)
+        self.assertEqual(m.get_processed_value("current_max_online"), 40)
         # The process will return value for this parameter that are not comming on the message
-        self.assertEqual(m.get_processed_value("current_max"), 40)
+        self.assertEqual(m.get_processed_value("current_max_offline"), None)
         self.assertEqual(m.get_processed_value("energy_session"), 19146)
         self.assertEqual(m.get_processed_value("energy_lifetime"), 24957914)
         self.assertEqual(m.get_processed_value("interval"), 51)
@@ -251,7 +249,7 @@ class TestMessage(unittest.TestCase):
         self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 39.3, "serial" : self.FAKE_SERIAL, "status" : "Charging", "voltage": 242.2, 
             "temperature" : 141.8, "energy_lifetime": 24957914,  "energy_session": 19146, "interval": 51,  
             "report_time": "09", "e" : "-001", "frequency" : 60.01, "loop_counter": "16708", 
-            "protocol_version" : "07", "p" : "0992", "current_max_charging": 40, "current_rating": 40, 
+            "protocol_version" : "07", "p" : "0992", "current_max_online": 40, "current_rating": 40, 
             "X" : "0", "Y" : "0", "counter" : "0177" })
 
 
