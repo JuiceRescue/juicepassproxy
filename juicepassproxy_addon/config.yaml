@@ -5,6 +5,8 @@ image: ghcr.io/JuiceRescue/juicepassproxy/juicepassproxy-{arch}
 slug: "juicepassproxy"
 ports:
   "8042/udp": 8042
+  "8042/udp": 8043
+  "8042/udp": 8047
 panel_icon: mdi:ev-station
 arch:
   - aarch64
