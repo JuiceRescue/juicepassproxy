@@ -4,6 +4,9 @@ from juicebox_exceptions import JuiceboxInvalidMessageFormat
 import codecs
 import datetime
 
+
+FAKE_SERIAL = "0910000000000000000000000000"
+
 #
 # Some messages here are not the real one captured, the serial number of device was changed after doing tests with real values and crc corrected
 #
@@ -91,7 +94,6 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(True, m.has_value("M"))
         self.assertEqual(m.build(), raw_msg)
 
-    FAKE_SERIAL = "0910000000000000000000000000"
     # https://github.com/snicker/juicepassproxy/issues/80
     OLD_MESSAGE = '0910000000000000000000000000:V247,L11097,S0,T34,E14,i84,e1,t30:'
     OLD_MESSAGE_2 = '0910000000000000000000000000:V247,L11156,E13322,A138,T28,t10,E14,i41,e1:'
@@ -107,13 +109,13 @@ class TestMessage(unittest.TestCase):
         m = juicebox_message_from_string(self.OLD_MESSAGE)
         self.assertEqual(m.payload_str, self.OLD_MESSAGE[:-1])
         self.assertEqual(m.crc_str, None)
-        self.assertEqual(m.get_value("serial"), self.FAKE_SERIAL)
+        self.assertEqual(m.get_value("serial"), FAKE_SERIAL)
         self.assertEqual(m.get_processed_value("status"), "Unplugged")
         self.assertEqual(m.get_processed_value("voltage"), 247)
         self.assertEqual(m.get_value("temperature"), "34")
         self.assertEqual(m.get_processed_value("temperature"), 93.2)
         # TODO complete other tests with this kind of assert 
-        self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 0, "serial" : self.FAKE_SERIAL, "status" : "Unplugged", "voltage": 247.0, 
+        self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 0, "serial" : FAKE_SERIAL, "status" : "Unplugged", "voltage": 247.0, 
             "temperature" : 93.2, "energy_lifetime": 11097,  "energy_session": 14, "interval": 84,  "report_time": "30", "e" : "1",
             "power" : 0})
 
@@ -125,7 +127,7 @@ class TestMessage(unittest.TestCase):
         m = juicebox_message_from_string(self.OLD_MESSAGE_2)
         self.assertEqual(m.payload_str, self.OLD_MESSAGE_2[:-1])
         self.assertEqual(m.crc_str, None)
-        self.assertEqual(m.get_value("serial"), self.FAKE_SERIAL)
+        self.assertEqual(m.get_value("serial"), FAKE_SERIAL)
         self.assertEqual(m.get_processed_value("status"), "Charging")
         self.assertEqual(m.get_value("temperature"), "28")
         self.assertEqual(m.get_processed_value("temperature"), 82.4)
@@ -142,7 +144,7 @@ class TestMessage(unittest.TestCase):
         m = juicebox_message_from_string(self.OLD_CHARGING)
         self.assertEqual(m.payload_str, self.OLD_CHARGING[:-1])
         self.assertEqual(m.crc_str, None)
-        self.assertEqual(m.get_value("serial"), self.FAKE_SERIAL)
+        self.assertEqual(m.get_value("serial"), FAKE_SERIAL)
         self.assertEqual(m.get_processed_value("status"), "Charging")
         self.assertEqual(m.get_processed_value("voltage"), 247)
         self.assertEqual(m.get_value("temperature"), "20")
@@ -159,7 +161,7 @@ class TestMessage(unittest.TestCase):
         m = juicebox_message_from_string(self.OLD_PLUGGED_IN)
         self.assertEqual(m.payload_str, self.OLD_PLUGGED_IN[:-1])
         self.assertEqual(m.crc_str, None)
-        self.assertEqual(m.get_value("serial"), self.FAKE_SERIAL)
+        self.assertEqual(m.get_value("serial"), FAKE_SERIAL)
         self.assertEqual(m.get_processed_value("status"), "Plugged In")
         self.assertEqual(m.get_processed_value("voltage"), 247)
         self.assertEqual(m.get_value("temperature"), "20")
@@ -218,7 +220,7 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_processed_value("interval"), 78)
         self.assertEqual(m.get_value("temperature"), "62")
         self.assertEqual(m.get_processed_value("temperature"), 143.6)
-        self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 39.4, "serial" : self.FAKE_SERIAL, "status" : "Charging", "voltage": 240.0, 
+        self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 39.4, "serial" : FAKE_SERIAL, "status" : "Charging", "voltage": 240.0, 
             "temperature" : 143.6, "energy_lifetime": 24880114,  "energy_session": 6804, "interval": 78, 
             "report_time": "09", "e" : "-001", "frequency" : 60.01, "loop_counter": "30048", 
             "protocol_version" : "07", "p" : "0992", "current_max_online": 40, "current_rating": 40, 
@@ -247,7 +249,7 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_processed_value("interval"), 51)
         self.assertEqual(m.get_value("temperature"), "61")
         self.assertEqual(m.get_processed_value("temperature"), 141.8)
-        self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 39.3, "serial" : self.FAKE_SERIAL, "status" : "Charging", "voltage": 242.2, 
+        self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 39.3, "serial" : FAKE_SERIAL, "status" : "Charging", "voltage": 242.2, 
             "temperature" : 141.8, "energy_lifetime": 24957914,  "energy_session": 19146, "interval": 51,  
             "report_time": "09", "e" : "-001", "frequency" : 60.01, "loop_counter": "16708", 
             "protocol_version" : "07", "p" : "0992", "current_max_online": 40, "current_rating": 40, 

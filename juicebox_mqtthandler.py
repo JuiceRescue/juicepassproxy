@@ -257,8 +257,10 @@ class JuiceboxMQTTHandler:
         self._device_name = device_name
         self._juicebox_id = juicebox_id
         self._experimental = experimental
+        self._config = config
         self._mitm_handler = mitm_handler
-        self._max_current = config.get_device(self._juicebox_id, "MAX_CURRENT", 48)
+        # Try to use first the MAX_CURRENT as maximum, if not found use the previous run current_rating or default of 48 which is safe and not so big
+        self._max_current = config.get_device(self._juicebox_id, "MAX_CURRENT", config.get_device(self._juicebox_id, "current_rating", 48))
         _LOGGER.info(f"max_current: {self._max_current}")
         self._error_count = 0
         self._error_timestamp_list = []
@@ -421,7 +423,7 @@ class JuiceboxMQTTHandler:
         
         _LOGGER.info("Checking for initial_states on config")        
         for key in self._entities.keys():
-            initial_state = config.get_device(self._juicebox_id, key + "_initial_state", None)
+            initial_state = self._config.get_device(self._juicebox_id, key + "_initial_state", None)
             if initial_state:
                 _LOGGER.info(f"got initial_state on config : {key} -> {initial_state}")
                 self._entities[key].add_kwargs(initial_state=initial_state)
@@ -461,8 +463,8 @@ class JuiceboxMQTTHandler:
             if entity.entity_type in MQTT_SENDING_ENTITIES:
                 entity.add_kwargs(mitm_handler=mitm_handler)
 
+    # TODO: To be removed as the the message is now parsed on JuiceboxMessage
     async def _basic_message_parse(self, data: bytes):
-        # TODO change to receive a JuiceboxMessage which is already parsed
 
         message = {"type": "basic", "current": 0, "energy_session": 0}
         active = True
@@ -563,27 +565,26 @@ class JuiceboxMQTTHandler:
         message["debug_message"] = f"{dbg_level}: {dbg_msg}"
         return message
 
+    async def _store_if_on_message(self, message, key):
+        if key in message:
+            self._config.update_device_value(self._juicebox_id, key, message[key])
+            await self._config.write_if_changed()
+            
     async def _basic_message_publish(self, message):
         _LOGGER.debug(f"Publish {message.get('type').title()} Message: {message}")
 
         # try:
         attributes = {}
+        
+        # This values are usefull when JPP starts again to start fast
+        await self._store_if_on_message(message, "current_rating")
+        await self._store_if_on_message(message, "current_max_offline")
+        
         for k in message:
             entity = self._entities.get(k, None)
             if entity and (entity.experimental is False or self._experimental is True):
 
-                # ignore if a new setting was defined in few seconds before
-                # this is necessary because the same entity is used to get the value from device and to set configuration
-                # This makes simple to user, but can create some inconsistencies
-                if isinstance(entity, JuiceboxMQTTSendingEntity) and entity.command_timestamp:
-                    elapsed = int(time.time() - entity.command_timestamp)
-                else:
-                    elapsed = 9999
-                    
-                if elapsed > 10:
-                    await entity.set_state(message.get(k, None))
-                else:
-                    _LOGGER.warning(f"ignoring {k} from juicebox device after update elapsed={elapsed}")
+                await entity.set_state(message.get(k, None))
                     
             attributes[k] = message.get(k, None)
         if (

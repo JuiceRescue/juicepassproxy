@@ -2,6 +2,7 @@ import unittest
 import random
 
 from juicebox_config import JuiceboxConfig
+from test_message import FAKE_SERIAL
 
 class TestMessage(unittest.IsolatedAsyncioTestCase):
 
@@ -24,6 +25,11 @@ class TestMessage(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(None, config.get("ANY", None))
 
         self.assertTrue(config.is_changed())
+
+
+        self.assertEqual(None, config.get_device(FAKE_SERIAL, "ANY", None))
+        config.update_device_value(FAKE_SERIAL, "ANY", value)
+        self.assertEqual(value, config.get_device(FAKE_SERIAL, "ANY", None))
 
         # TODO more basic tests
         

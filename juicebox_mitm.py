@@ -171,6 +171,7 @@ class JuiceboxMITM:
                         _LOGGER.info("setting current_max_online_set with current_rating")
                         await self._mqtt_handler.get_entity("current_max_online_set").set_state(self._last_status_message.get_processed_value("current_rating"))
 
+                #TODO now the MQTT is storing previous data on config, this can be used to get initialize theses values from previous JPP execution
                 if not self.is_mqtt_numeric_entity_defined("current_max_offline_set"): 
                     if decoded_message.has_value("current_max_offline"):
                         _LOGGER.info("setting current_max_offline_set with current_max_offline")

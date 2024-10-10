@@ -68,6 +68,10 @@ class JuiceboxConfig:
             self.update({ key : value })
             self._changed = True
 
+    def update_device_value(self, device, key, value):
+        self.update_value(device + "_" + key, value)
+
+
     def pop(self, key):
        if key in self._config:
            self._config.pop(key, None)
