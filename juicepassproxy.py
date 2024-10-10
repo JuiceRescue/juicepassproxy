@@ -24,6 +24,7 @@ from const import (
     DEFAULT_MQTT_DISCOVERY_PREFIX,
     DEFAULT_MQTT_HOST,
     DEFAULT_MQTT_PORT,
+    DEFAULT_TELNET_PORT,
     DEFAULT_TELNET_TIMEOUT,
     EXTERNAL_DNS,
     LOG_DATE_FORMAT,
@@ -122,10 +123,11 @@ async def is_valid_ip(test_ip):
     return True
 
 
-async def get_enelx_server_port(juicebox_host, telnet_timeout=None):
+async def get_enelx_server_port(juicebox_host, telnet_port, telnet_timeout=None):
     try:
         async with JuiceboxTelnet(
             juicebox_host,
+            telnet_port,
             loglevel=_LOGGER.getEffectiveLevel(),
             timeout=telnet_timeout,
         ) as tn:
@@ -151,10 +153,11 @@ async def get_enelx_server_port(juicebox_host, telnet_timeout=None):
     return None
 
 
-async def get_juicebox_id(juicebox_host, telnet_timeout=None):
+async def get_juicebox_id(juicebox_host, telnet_port, telnet_timeout=None):
     try:
         async with JuiceboxTelnet(
             juicebox_host,
+            telnet_port,
             loglevel=_LOGGER.getEffectiveLevel(),
             timeout=telnet_timeout,
         ) as tn:
@@ -299,6 +302,16 @@ async def parse_args():
         help="If set, will not send commands received from EnelX to the JuiceBox nor send outgoing information from the JuiceBox to EnelX",
     )
     parser.add_argument(
+        "--tp",
+        "--telnet_port",
+        dest="telnet_port",
+        required=False,
+        type=int,
+        metavar="PORT",
+        default=DEFAULT_TELNET_PORT,
+        help="Telnet PORT (default: %(default)s)",
+    )
+    parser.add_argument(
         "--telnet_timeout",
         type=int,
         metavar="SECONDS",
@@ -394,6 +407,11 @@ async def main():
     _LOGGER.info(f"config_loc: {config_loc}")
     config = await load_config(config_loc)
 
+    telnet_port = int(args.telnet_port)
+    _LOGGER.info(f"telnet port: {telnet_port}")
+    if telnet_port == 0:
+        telnet_port = 2000
+
     telnet_timeout = int(args.telnet_timeout)
     _LOGGER.info(f"telnet timeout: {telnet_timeout}")
     if telnet_timeout == 0:
@@ -405,7 +423,7 @@ async def main():
     enelx_server_port = None
     if not ignore_enelx:
         enelx_server_port = await get_enelx_server_port(
-            args.juicebox_host, telnet_timeout=telnet_timeout
+            args.juicebox_host, args.telnet_port, telnet_timeout=telnet_timeout
         )
 
     if enelx_server_port:
@@ -477,11 +495,12 @@ async def main():
         )
     config.update({"ENELX_IP": enelx_addr[0]})
     _LOGGER.info(f"enelx_addr: {enelx_addr[0]}:{enelx_addr[1]}")
+    _LOGGER.info(f"telnet_addr: {args.juicebox_host}:{args.telnet_port}")
 
     if juicebox_id := args.juicebox_id:
         pass
     elif juicebox_id := await get_juicebox_id(
-        args.juicebox_host, telnet_timeout=telnet_timeout
+        args.juicebox_host, args.telnet_port, telnet_timeout=telnet_timeout
     ):
         pass
     else:
@@ -553,6 +572,7 @@ async def main():
             udpc_updater = JuiceboxUDPCUpdater(
                 juicebox_host=args.juicebox_host,
                 jpp_host=jpp_host,
+                telnet_port=telnet_port,
                 udpc_port=local_addr[1],
                 telnet_timeout=telnet_timeout,
                 loglevel=_LOGGER.getEffectiveLevel(),

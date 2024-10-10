@@ -150,6 +150,8 @@ options:
   --ignore_enelx        If set, will not send commands received from EnelX to
                         the JuiceBox nor send outgoing information from the
                         JuiceBox to EnelX
+  --tp PORT, --telnet_port PORT
+                        Telnet PORT (default: 2000)
   --telnet_timeout SECONDS
                         Timeout in seconds for Telnet operations (default: 30)
   --juicebox_id ID      JuiceBox ID. If not defined, will obtain it
@@ -172,7 +174,7 @@ _For `--enelx_ip`, only use the IP address of the EnelX Server and **not** the f
 
 ## Getting EnelX Server IPs
 
-To get the destination IP:Port of the EnelX server, telnet into your JuiceBox device:
+To get the destination IP:Port of the EnelX server, telnet into your JuiceBox device and use the [list](https://docs.silabs.com/gecko-os/4/standard/4.2/cmd/commands#stream-list) command:
 `$ telnet 192.168.x.x 2000`
 and type the `list` command:
 
@@ -183,7 +185,13 @@ list
 # 1 UDPC  juicenet-udp-prod3-usa.enelx.com:8047 (26674)
 ```
 
-The address is in the `UDPC` line. Run, `ping`, `nslookup`, or similar command to determine the IP.
+The address is in the `UDPC` line. Run, `ping`, `nslookup`, or similar command to determine the IP.  The following [network_lookup](https://docs.silabs.com/gecko-os/4/standard/4.2/cmd/commands#network-lookup) command can be run in JuiceBox telnet to look it up while still connected:
+```
+network_lookup juicenet-udp-prod3-usa.enelx.com
+54.161.185.130
+network_lookup jvb1.emotorwerks.com
+158.47.1.128
+```
 
 As of November, 2023: `juicenet-udp-prod3-usa.enelx.com` = `54.161.185.130`.
 
@@ -229,3 +237,9 @@ As of November, 2023: `juicenet-udp-prod3-usa.enelx.com` = `54.161.185.130`.
 - **Max Current (Online/Device)**
    - The value that are sent from the juicebox device indicating what will the online charge current
 
+## Multiple JuiceBoxes
+- Multiple instances of JPP must be executed, one per JuiceBox.
+    - Each JPP instance should specify the following parameters in addition to the basic parameters.
+        - --name (each should use a different entity name)
+        - --local_port (each needs to use their own port but make sure the UDP 8042 redirection rule matches the destination port)
+        - --config_loc (each needs their own directory)

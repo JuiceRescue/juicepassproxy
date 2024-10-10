@@ -18,6 +18,7 @@ class JuiceboxUDPCUpdater:
         self,
         juicebox_host,
         jpp_host,
+        telnet_port,
         udpc_port=8047,
         telnet_timeout=None,
         loglevel=None,
@@ -27,6 +28,7 @@ class JuiceboxUDPCUpdater:
         self._juicebox_host = juicebox_host
         self._jpp_host = jpp_host
         self._udpc_port = udpc_port
+        self._telnet_port = telnet_port
         self._telnet_timeout = telnet_timeout
         self._default_sleep_interval = 30
         self._udpc_update_loop_task = None
@@ -57,6 +59,7 @@ class JuiceboxUDPCUpdater:
             connect_attempt += 1
             self._telnet = JuiceboxTelnet(
                 self._juicebox_host,
+                self._telnet_port,
                 loglevel=_LOGGER.getEffectiveLevel(),
                 timeout=self._telnet_timeout,
             )
