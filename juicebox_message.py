@@ -346,6 +346,14 @@ class JuiceboxStatusMessage(JuiceboxMessage):
                data[self.defs[k]["alias"]] = self.get_processed_value(k)
             else:
                data[k] = self.values[k]
+
+        # TODO: Check for a more generic way to have this calculated data               
+        if ("current" in data) and ("voltage" in data):
+            data["power"] = round(data["voltage"] * data["current"])
+
+        # On original code the energy_session is chaged to zero when not charging
+        # here we will keep sending the value that came from device
+
         return data
 
 

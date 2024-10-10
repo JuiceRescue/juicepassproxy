@@ -114,7 +114,8 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_processed_value("temperature"), 93.2)
         # TODO complete other tests with this kind of assert 
         self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 0, "serial" : self.FAKE_SERIAL, "status" : "Unplugged", "voltage": 247.0, 
-            "temperature" : 93.2, "energy_lifetime": 11097,  "energy_session": 14, "interval": 84,  "report_time": "30", "e" : "1"})
+            "temperature" : 93.2, "energy_lifetime": 11097,  "energy_session": 14, "interval": 84,  "report_time": "30", "e" : "1",
+            "power" : 0})
 
     def test_old_message_2(self):
         """
@@ -221,6 +222,7 @@ class TestMessage(unittest.TestCase):
             "temperature" : 143.6, "energy_lifetime": 24880114,  "energy_session": 6804, "interval": 78, 
             "report_time": "09", "e" : "-001", "frequency" : 60.01, "loop_counter": "30048", 
             "protocol_version" : "07", "p" : "0992", "current_max_online": 40, "current_rating": 40, 
+            "power" : 9456,
             "X" : "0", "Y" : "0", "counter" : "0001" })
 
     def test_v07_2(self):
@@ -249,6 +251,7 @@ class TestMessage(unittest.TestCase):
             "temperature" : 141.8, "energy_lifetime": 24957914,  "energy_session": 19146, "interval": 51,  
             "report_time": "09", "e" : "-001", "frequency" : 60.01, "loop_counter": "16708", 
             "protocol_version" : "07", "p" : "0992", "current_max_online": 40, "current_rating": 40, 
+            "power" : 9518,
             "X" : "0", "Y" : "0", "counter" : "0177" })
 
 
