@@ -101,7 +101,7 @@ Variable | Required | Description & Default |
 **EXPERIMENTAL**  | No  | Default: false. Enables additional entities in Home Assistant that are in in development or can be used toward developing the ability to send commands to a JuiceBox
 **IGNORE_ENELX**  | No  | Default: false. If true, will not send commands received from EnelX to the JuiceBox nor send outgoing information from the JuiceBox to EnelX
 **TELNET_TIMEOUT**  | No  | Default: 30. Timeout in seconds for telnet operations.
-**JUICEBOX_ID**  | No | If not defined, will attempt to get the JuiceBox ID using telnet.
+**JUICEBOX_ID**  | No | If not defined, will attempt to get the JuiceBox ID using telnet, don't use this if you are testing multiple devices.
 **LOCAL_IP**<br><br>_Deprecated Variable: SRC_ | No | If not defined, will attempt to get the Local Docker IP. Can optionally define port (ex. 127.0.0.1:8047). If unsuccessful, will default to 127.0.0.1.
 **LOCAL_PORT** | No | Local port for JuicePass Proxy to listen on. If not defined, will use the EnelX Port.
 **ENELX_IP**<br><br>_Deprecated Variable: DST_ | No | If not defined, will attempt to get the IP of the EnelX Server. If unsuccessful, will default to 54.161.185.130. Can optionally define port (ex. 54.161.185.130:8047). If defined, only use the IP address of the EnelX Server and not the fully qualified domain name to avoid DNS lookup loops.
@@ -240,6 +240,10 @@ As of November, 2023: `juicenet-udp-prod3-usa.enelx.com` = `54.161.185.130`.
 ## Multiple JuiceBoxes
 - Multiple instances of JPP must be executed, one per JuiceBox.
     - Each JPP instance should specify the following parameters in addition to the basic parameters.
-        - --name (each should use a different entity name)
-        - --local_port (each needs to use their own port but make sure the UDP 8042 redirection rule matches the destination port)
-        - --config_loc (each needs their own directory)
+        - **--name** - each should use a different name, because this is the identifier of MQTT topic
+        - **--juicebox_id** - defining this disable the telnet and will start faster, must be the correct serial of each device
+        - **--local_port** - each needs to use their own port but make sure the UDP 8042 redirection rule matches the destination port
+        - **--config_loc** - each needs their own directory
+    - Future versions can be able to work with multiple devices : https://github.com/JuiceRescue/juicepassproxy/issues/102
+
+

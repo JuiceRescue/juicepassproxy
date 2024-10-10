@@ -622,7 +622,7 @@ class JuiceboxMQTTHandler:
     async def local_mitm_handler(self, data, decoded_message):
         message = None
         try:
-            _LOGGER.debug(f"From JuiceBox: {data} decoded={decoded_message}")
+            _LOGGER.debug(f"From JuiceBox: {data} decoded={decoded_message}")            
             if "JuiceboxMITM_OSERROR" in str(data):
                 message = await self._udp_mitm_oserror_message_parse(data)
                 
@@ -639,6 +639,13 @@ class JuiceboxMQTTHandler:
                 message = await self._basic_message_parse(data)
         
             _LOGGER.debug(f"decode/parsed message = {message}")
+            
+            # Something is wrong if device is changed
+            # as the entities use the juicebox_id as unique_id this should not happen
+            if "serial" in message:
+                if message["serial"] != self._juicebox_id:
+                    _LOGGER.error(f"serial {message['serial']} on received message does not match juicebox_id {self._juicebox_id}")
+                    # For now just give the error, but will be better to dont send values on entities and return 
             
             if message:
                 await self._basic_message_publish(message)
