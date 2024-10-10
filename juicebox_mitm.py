@@ -176,12 +176,11 @@ class JuiceboxMITM:
                         _LOGGER.info("setting current_max_offline_set with current_max_offline")
                         await self._mqtt_handler.get_entity("current_max_offline_set").set_state(self._last_status_message.get_processed_value("current_max_offline"))
                     # After a reboot of device, the device that does not send offline will start with online value defined with offline setting                            
-                    elif self._booted_in_less_than(30) and decoded_message.has_value("current_max_online"):
-                        _LOGGER.info("setting current_max_offline_set with current_max_online after reboot")
-                        await self._mqtt_handler.get_entity("current_max_online_set").set_state(self._last_status_message.get_processed_value("current_max_online"))
-                    elif ((elapsed > 600) or self._booted_in_less_than(30)) and decoded_message.has_value("current_rating"):
-                        _LOGGER.info("setting current_max_offline_set with current_rating")
-                        await self._mqtt_handler.get_entity("current_max_online_set").set_state(self._last_status_message.get_processed_value("current_rating"))
+                    # as the device will start to use the offline current after 5 minutes without responses from server, we can consider that after this time
+                    # we got the offline value from the online parameter, use the parameter after 6 minutes from first status message
+                    elif (self._booted_in_less_than(30) or (elapsed > 6*60) ) and decoded_message.has_value("current_max_online"):
+                        _LOGGER.info(f"setting current_max_offline_set with current_max_online after reboot or more than 5 minutes (elapsed={elapsed})") 
+                        await self._mqtt_handler.get_entity("current_max_offline_set").set_state(self._last_status_message.get_processed_value("current_max_online"))
                             
             elif isinstance(decoded_message, JuiceboxDebugMessage):
                 if decoded_message.is_boot():
