@@ -246,7 +246,7 @@ class JuiceboxMQTTHandler:
         device_name,
         mqtt_settings,
         experimental,
-        max_current,
+        config,
         juicebox_id=None,
         mitm_handler=None,
         loglevel=None,
@@ -258,7 +258,8 @@ class JuiceboxMQTTHandler:
         self._juicebox_id = juicebox_id
         self._experimental = experimental
         self._mitm_handler = mitm_handler
-        self._max_current = max_current
+        self._max_current = config.get_device(self._juicebox_id, "MAX_CURRENT", 48)
+        _LOGGER.info(f"max_current: {self._max_current}")
         self._error_count = 0
         self._error_timestamp_list = []
 
@@ -316,7 +317,7 @@ class JuiceboxMQTTHandler:
                 unit_of_measurement="A",
                 min=0,
                 max=self._max_current,
-                # no initial state, to use the value that will be received from juicebox
+                # no initial state, to use the value that will be received from juicebox or from config
                 # because of this, the entity will only show later (first time) on homeassistant when value is set
                 # and can change the homeassistant value
             ),
@@ -334,7 +335,7 @@ class JuiceboxMQTTHandler:
                 unit_of_measurement="A",
                 min=0,
                 max=self._max_current,
-                # no initial state, to use the value that will be received from juicebox
+                # no initial state, to use the value that will be received from juicebox or from config
                 # because of this, the entity will only show later (first time) on homeassistant when value is set
                 # and can change the homeassistant value
             ),
@@ -417,6 +418,14 @@ class JuiceboxMQTTHandler:
                 enabled_by_default=False,
             ),
         }
+        
+        _LOGGER.info("Checking for initial_states on config")        
+        for key in self._entities.keys():
+            initial_state = config.get_device(self._juicebox_id, key + "_initial_state", None)
+            if initial_state:
+                _LOGGER.info(f"got initial_state on config : {key} -> {initial_state}")
+                self._entities[key].add_kwargs(initial_state=initial_state)
+                
         for entity in self._entities.values():
             entity.add_kwargs(
                 juicebox_id=self._juicebox_id,

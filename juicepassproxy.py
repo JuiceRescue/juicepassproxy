@@ -10,10 +10,8 @@ from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
 import dns
-import yaml
 from aiorun import run
 from const import (
-    CONF_YAML,
     DAYS_TO_KEEP_LOGS,
     DEFAULT_DEVICE_NAME,
     DEFAULT_ENELX_IP,
@@ -38,6 +36,7 @@ from juicebox_mitm import JuiceboxMITM
 from juicebox_mqtthandler import JuiceboxMQTTHandler
 from juicebox_telnet import JuiceboxTelnet
 from juicebox_udpcupdater import JuiceboxUDPCUpdater
+from juicebox_config import JuiceboxConfig
 
 logging.basicConfig(
     format=LOG_FORMAT,
@@ -178,28 +177,6 @@ async def get_juicebox_id(juicebox_host, telnet_port, telnet_timeout=None):
     return None
 
 
-async def load_config(config_loc):
-    config = {}
-    try:
-        with open(config_loc, "r") as file:
-            config = yaml.safe_load(file)
-    except Exception as e:
-        _LOGGER.warning(f"Can't load {config_loc}. ({e.__class__.__qualname__}: {e})")
-    if not config:
-        config = {}
-    return config
-
-
-async def write_config(config, config_loc):
-    try:
-        with open(config_loc, "w") as file:
-            yaml.dump(config, file)
-        return True
-    except Exception as e:
-        _LOGGER.warning(
-            f"Can't write to {config_loc}. ({e.__class__.__qualname__}: {e})"
-        )
-    return False
 
 
 def ip_to_tuple(ip):
@@ -400,12 +377,8 @@ async def main():
         )
         sys.exit(1)
 
-    config_loc = Path(args.config_loc)
-    config_loc.mkdir(parents=True, exist_ok=True)
-    config_loc = config_loc.joinpath(CONF_YAML)
-    config_loc.touch(exist_ok=True)
-    _LOGGER.info(f"config_loc: {config_loc}")
-    config = await load_config(config_loc)
+    config = JuiceboxConfig(args.config_loc)
+    await config.load()
 
     telnet_port = int(args.telnet_port)
     _LOGGER.info(f"telnet port: {telnet_port}")
@@ -433,8 +406,8 @@ async def main():
     else:
         enelx_server = config.get("ENELX_SERVER", DEFAULT_ENELX_SERVER)
         enelx_port = config.get("ENELX_PORT", DEFAULT_ENELX_PORT)
-    config.update({"ENELX_SERVER": enelx_server})
-    config.update({"ENELX_PORT": enelx_port})
+    config.update_value("ENELX_SERVER", enelx_server)
+    config.update_value("ENELX_PORT", enelx_port)
     _LOGGER.info(f"enelx_server: {enelx_server}")
     _LOGGER.info(f"enelx_port: {enelx_port}")
 
@@ -466,7 +439,7 @@ async def main():
             f"{config.get('LOCAL_IP', config.get('SRC', DEFAULT_LOCAL_IP))}:"
             f"{local_port}"
         )
-    config.update({"LOCAL_IP": local_addr[0]})
+    config.update_value("LOCAL_IP", local_addr[0])
     _LOGGER.info(f"local_addr: {local_addr[0]}:{local_addr[1]}")
 
     localhost_check = (
@@ -493,7 +466,7 @@ async def main():
             f"{config.get('ENELX_IP', config.get('DST', DEFAULT_ENELX_IP))}:"
             f"{enelx_port}"
         )
-    config.update({"ENELX_IP": enelx_addr[0]})
+    config.update_value("ENELX_IP", enelx_addr[0])
     _LOGGER.info(f"enelx_addr: {enelx_addr[0]}:{enelx_addr[1]}")
     _LOGGER.info(f"telnet_addr: {args.juicebox_host}:{args.telnet_port}")
 
@@ -506,7 +479,7 @@ async def main():
     else:
         juicebox_id = config.get("JUICEBOX_ID")
     if juicebox_id:
-        config.update({"JUICEBOX_ID": juicebox_id})
+        config.update_value("JUICEBOX_ID", juicebox_id)
         _LOGGER.info(f"juicebox_id: {juicebox_id}")
     else:
         _LOGGER.error(
@@ -516,14 +489,11 @@ async def main():
     experimental = args.experimental
     _LOGGER.info(f"experimental: {experimental}")
 
-    max_current = config.get("MAX_CURRENT", 48)
-    _LOGGER.info(f"max_current: {max_current}")
-    
     # Remove DST and SRC from Config as they have been replaced by ENELX_IP and LOCAL_IP respectively
-    config.pop("DST", None)
-    config.pop("SRC", None)
+    config.pop("DST")
+    config.pop("SRC")
 
-    await write_config(config, config_loc)
+    await config.write_if_changed()
 
     mqtt_settings = Settings.MQTT(
         host=args.mqtt_host,
@@ -544,7 +514,7 @@ async def main():
             mqtt_settings=mqtt_settings,
             device_name=args.device_name,
             juicebox_id=juicebox_id,
-            max_current=max_current,
+            config=config,
             experimental=experimental,
             loglevel=_LOGGER.getEffectiveLevel(),
         )

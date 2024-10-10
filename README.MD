@@ -247,3 +247,8 @@ As of November, 2023: `juicenet-udp-prod3-usa.enelx.com` = `54.161.185.130`.
     - Future versions can be able to work with multiple devices : https://github.com/JuiceRescue/juicepassproxy/issues/102
 
 
+## Configuration file
+- You can configure initial state of mqtt entities :
+    - **ENTITY_initial_state** or **SERIAL_ENTITY_initial_state**
+    - **current_max_offline_set_initial_state** can be used for device that does not send current_max_offline value on status messages (v07 protocol)
+    
