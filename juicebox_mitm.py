@@ -30,6 +30,7 @@ class JuiceboxMITM:
         remote_mitm_handler=None,
         mqtt_handler=None,
         loglevel=None,
+        reuse_port=True,
     ):
         if loglevel is not None:
             _LOGGER.setLevel(loglevel)
@@ -40,6 +41,7 @@ class JuiceboxMITM:
         self._local_mitm_handler = local_mitm_handler
         self._remote_mitm_handler = remote_mitm_handler
         self._mqtt_handler = mqtt_handler
+        self._reuse_port = reuse_port
         self._loop = asyncio.get_running_loop()
         self._mitm_loop_task: asyncio.Task = None
         self._sending_lock = asyncio.Lock()
@@ -54,8 +56,7 @@ class JuiceboxMITM:
         self._boot_timestamp = None
 
     async def start(self) -> None:
-        _LOGGER.info("Starting JuiceboxMITM")
-        _LOGGER.debug(f"JPP: {self._jpp_addr[0]}:{self._jpp_addr[1]}")
+        _LOGGER.info(f"Starting JuiceboxMITM at {self._jpp_addr[0]}:{self._jpp_addr[1]} reuse_port={self._reuse_port}")
         _LOGGER.debug(f"EnelX: {self._enelx_addr[0]}:{self._enelx_addr[1]}")
 
         await self._connect()
@@ -82,12 +83,12 @@ class JuiceboxMITM:
             try:
                 if self._sending_lock.locked():
                     self._dgram = await asyncio_dgram.bind(
-                        self._jpp_addr, reuse_port=True
+                        self._jpp_addr, reuse_port=self._reuse_port
                     )
                 else:
                     async with self._sending_lock:
                         self._dgram = await asyncio_dgram.bind(
-                            self._jpp_addr, reuse_port=True
+                            self._jpp_addr, reuse_port=self._reuse_port
                         )
             except OSError as e:
                 _LOGGER.warning(

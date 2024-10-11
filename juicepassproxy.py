@@ -198,11 +198,13 @@ async def parse_args():
         metavar="HOST",
         help="Host or IP address of the JuiceBox. Required for --update_udpc or if --enelx_ip not defined.",
     )
+
     parser.add_argument(
         "--update_udpc",
         action="store_true",
         help="Update UDPC on the JuiceBox. Requires --juicebox_host",
     )
+
     parser.add_argument(
         "--jpp_host",
         "--juicepass_proxy_host",
@@ -213,6 +215,7 @@ async def parse_args():
         "Proxy. Optional: only necessary when using --update_udpc and "
         "it will be inferred from the address in --local_ip if omitted.",
     )
+
     parser.add_argument(
         "-H",
         "--mqtt_host",
@@ -221,6 +224,7 @@ async def parse_args():
         default=DEFAULT_MQTT_HOST,
         help="MQTT Hostname to connect to (default: %(default)s)",
     )
+
     parser.add_argument(
         "-p",
         "--mqtt_port",
@@ -229,12 +233,15 @@ async def parse_args():
         default=DEFAULT_MQTT_PORT,
         help="MQTT Port (default: %(default)s)",
     )
+
     parser.add_argument(
         "-u", "--mqtt_user", type=str, help="MQTT Username", metavar="USER"
     )
+
     parser.add_argument(
         "-P", "--mqtt_password", type=str, help="MQTT Password", metavar="PASSWORD"
     )
+
     parser.add_argument(
         "-D",
         "--mqtt_discovery_prefix",
@@ -244,6 +251,7 @@ async def parse_args():
         default=DEFAULT_MQTT_DISCOVERY_PREFIX,
         help="Home Assistant MQTT topic prefix (default: %(default)s)",
     )
+
     parser.add_argument(
         "--config_loc",
         type=str,
@@ -251,6 +259,7 @@ async def parse_args():
         default=Path.home().joinpath(".juicepassproxy"),
         help="The location to store the config file (default: %(default)s)",
     )
+
     parser.add_argument(
         "--log_loc",
         type=str,
@@ -258,6 +267,7 @@ async def parse_args():
         default=Path.home(),
         help="The location to store the log files (default: %(default)s)",
     )
+
     parser.add_argument(
         "--name",
         type=str,
@@ -265,19 +275,27 @@ async def parse_args():
         help="Home Assistant Device Name (default: %(default)s)",
         dest="device_name",
     )
+
     parser.add_argument(
         "--debug", action="store_true", help="Show Debug level logging. (default: Info)"
     )
+
+    parser.add_argument(
+        "--disable_reuse_port", action="store_true", help="Disable port reuse for server socket (default: reuse_port)"
+    )
+
     parser.add_argument(
         "--experimental",
         action="store_true",
         help="Enables additional entities in Home Assistant that are in in development or can be used toward developing the ability to send commands to a JuiceBox.",
     )
+
     parser.add_argument(
         "--ignore_enelx",
         action="store_true",
         help="If set, will not send commands received from EnelX to the JuiceBox nor send outgoing information from the JuiceBox to EnelX",
     )
+
     parser.add_argument(
         "--tp",
         "--telnet_port",
@@ -288,6 +306,7 @@ async def parse_args():
         default=DEFAULT_TELNET_PORT,
         help="Telnet PORT (default: %(default)s)",
     )
+
     parser.add_argument(
         "--telnet_timeout",
         type=int,
@@ -295,6 +314,7 @@ async def parse_args():
         default=DEFAULT_TELNET_TIMEOUT,
         help="Timeout in seconds for Telnet operations (default: %(default)s)",
     )
+
     parser.add_argument(
         "--juicebox_id",
         type=str,
@@ -302,6 +322,7 @@ async def parse_args():
         help="JuiceBox ID. If not defined, will obtain it automatically.",
         dest="juicebox_id",
     )
+
     parser.add_argument(
         "--local_ip",
         "-s",
@@ -312,6 +333,7 @@ async def parse_args():
         metavar="IP",
         help="Local IP (and optional port). If not defined, will obtain it automatically. (Ex. 127.0.0.1:8047) [Deprecated: -s --src]",
     )
+
     parser.add_argument(
         "--local_port",
         dest="local_port",
@@ -320,6 +342,7 @@ async def parse_args():
         metavar="PORT",
         help="Local Port for JPP to listen on.",
     )
+
     parser.add_argument(
         "--enelx_ip",
         "-d",
@@ -527,6 +550,9 @@ async def main():
             enelx_addr=enelx_addr,  # EnelX IP
             ignore_enelx=ignore_enelx,
             loglevel=_LOGGER.getEffectiveLevel(),
+            # windows users are having trouble with reuse_port=True
+            # TODO find a safe way to detect windows and change the default value
+            reuse_port=config.get("reuse_port", not args.disable_reuse_port), 
         )
         await mitm_handler.set_local_mitm_handler(mqtt_handler.local_mitm_handler)
         await mitm_handler.set_remote_mitm_handler(mqtt_handler.remote_mitm_handler)
