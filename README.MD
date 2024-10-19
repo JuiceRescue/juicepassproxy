@@ -207,7 +207,8 @@ As of November, 2023: `juicenet-udp-prod3-usa.enelx.com` = `54.161.185.130`.
     - if your device still works with ENELX servers but not with juicepass :
         - a packet capture will provide usefull information to understand what are the differences that are not being considered yet
 - Sometimes it takes a while to stabilize, if you are changing between ENEL X and JPP let it running for some minutes before testing
-
+- For devices that uses the protocol version v07 the juicepassproxy will only start talking with device after 6 minutes to make sure it gets the correct offline current in the device.
+ 
 
 ## Controlling Charging current
 
@@ -250,7 +251,7 @@ As of November, 2023: `juicenet-udp-prod3-usa.enelx.com` = `54.161.185.130`.
 ## Configuration file
 - You can configure initial state of mqtt entities :
     - **ENTITY_initial_state** or **SERIAL_ENTITY_initial_state**
-    - **current_max_offline_set_initial_state** can be used for device that does not send current_max_offline value on status messages (v07 protocol)
+    - **current_max_offline_set_initial_state** can be used for device that does not send current_max_offline value on status messages (v07 protocol) and do faster startup
     
 ## Upgrading from older versions if you have any problem with wrong entities on Homeassistant
 - Stop juicepassproxy
