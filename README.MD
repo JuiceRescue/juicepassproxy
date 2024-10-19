@@ -207,8 +207,10 @@ As of November, 2023: `juicenet-udp-prod3-usa.enelx.com` = `54.161.185.130`.
     - if your device still works with ENELX servers but not with juicepass :
         - a packet capture will provide usefull information to understand what are the differences that are not being considered yet
 - Sometimes it takes a while to stabilize, if you are changing between ENEL X and JPP let it running for some minutes before testing
+
+## juicepassproxy important behaviours to understand
 - For devices that uses the protocol version v07 the juicepassproxy will only start talking with device after 6 minutes to make sure it gets the correct offline current in the device.
- 
+- when defining the MQTT entities that are show on homeassistant  juicepassproxy will define a max_current value, on the first time it starts it will use 48A for this value, after receiving the device rating the value will be stored on configuration and at next start will be used as maximum to allow the correct range on homeassistant
 
 ## Controlling Charging current
 
