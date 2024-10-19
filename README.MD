@@ -252,3 +252,9 @@ As of November, 2023: `juicenet-udp-prod3-usa.enelx.com` = `54.161.185.130`.
     - **ENTITY_initial_state** or **SERIAL_ENTITY_initial_state**
     - **current_max_offline_set_initial_state** can be used for device that does not send current_max_offline value on status messages (v07 protocol)
     
+## Upgrading from older versions if you have any problem with wrong entities on Homeassistant
+- Stop juicepassproxy
+- Remove old configuration on MQTT, using mosquitto_sub or any other MQTT client
+    - **mosquitto_sub -t "homeassistant/+/JuiceBox/+/config" -v --remove-retained**
+- Remove Juicebox device on Homeassistant
+- Start juicepassproxy
