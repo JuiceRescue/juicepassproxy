@@ -25,6 +25,8 @@ STATUS_DEFS = {
 
 FIELD_SERIAL = "serial"
 FIELD_CURRENT = "current"
+FIELD_VOLTAGE = "voltage"
+FIELD_POWER = "power"
 
   
 def process_status(message, value):
@@ -76,7 +78,19 @@ def process_frequency(message, value):
     return round(float(value) * 0.01, 2)
 
 def process_current(message, value):
+    if value is None:
+        return 0
+        
     return round(float(value) * 0.1, 1)
+
+
+
+def process_power(message, value):
+    if message.has_value(FIELD_VOLTAGE):
+       return  round(message.get_processed_value(FIELD_VOLTAGE) * message.get_processed_value(FIELD_CURRENT))
+            
+    
+
 
 
 FROM_JUICEBOX_FIELD_DEFS = {
@@ -102,7 +116,8 @@ FROM_JUICEBOX_FIELD_DEFS = {
     "L" : { "alias" : "energy_lifetime", "process" : process_int },
     # p ?
     # P ? v09u - does not came when car is unplugged and appear to be allways 0
-    # r ? v09u - appear to be fixed to 995 in one device
+    # r ? v09u - appear to be fixed to 995 in one device, but found other values 
+    #     https://github.com/JuiceRescue/juicepassproxy/issues/84#issuecomment-2424907089
     "s" : { "alias" : "counter" },
     "S" : { "alias" : "status", "process" : process_status },
     # t - probably the report time in seconds - "every 9 seconds" (or may end up being 10).
@@ -114,6 +129,8 @@ FROM_JUICEBOX_FIELD_DEFS = {
     "V" : { "alias" : "voltage", "process" : process_voltage },
     # X ?
     # Y ?
+    # Calculated parameters
+    "power" : { "process" : process_power },
     }
 
 
@@ -195,7 +212,8 @@ class JuiceboxMessage:
         self.aliases = {}
         # to make easier to use get_values
         for k in self.defs:
-           self.aliases[self.defs[k]["alias"]] = k
+           if "alias" in self.defs[k]:
+               self.aliases[self.defs[k]["alias"]] = k
 
         pass
 
@@ -272,10 +290,11 @@ class JuiceboxMessage:
         
 
     def get_processed_value(self, type):
+
         if type in self.aliases:
            return self.get_processed_value(self.aliases[type])
            
-        if "process" in self.defs[type]:
+        if (type in self.defs) and ("process" in self.defs[type]):
             return self.defs[type]["process"](self, self.get_value(type))
 
         return self.get_value(type)
@@ -340,7 +359,9 @@ class JuiceboxStatusMessage(JuiceboxMessage):
         
     # Generate data like old processing
     def to_simple_format(self):
+        # Default values that should be in all status messages
         data = { "type" : "basic", "current": 0, "energy_session": 0}
+        
         for k in self.values:
             if k in self.defs:
                data[self.defs[k]["alias"]] = self.get_processed_value(k)
@@ -348,8 +369,10 @@ class JuiceboxStatusMessage(JuiceboxMessage):
                data[k] = self.values[k]
 
         # TODO: Check for a more generic way to have this calculated data               
-        if ("current" in data) and ("voltage" in data):
-            data["power"] = round(data["voltage"] * data["current"])
+        if not FIELD_POWER in data:
+            power = self.get_processed_value(FIELD_POWER)
+            if not power is None:
+               data[FIELD_POWER] = power
 
         # On original code the energy_session is chaged to zero when not charging
         # here we will keep sending the value that came from device

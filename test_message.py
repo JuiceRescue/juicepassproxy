@@ -113,6 +113,8 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_processed_value("status"), "Unplugged")
         self.assertEqual(m.get_processed_value("voltage"), 247)
         self.assertEqual(m.get_value("temperature"), "34")
+        self.assertEqual(m.get_value("current"), None)
+        self.assertEqual(m.get_processed_value("current"), 0)
         self.assertEqual(m.get_processed_value("temperature"), 93.2)
         # TODO complete other tests with this kind of assert 
         self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 0, "serial" : FAKE_SERIAL, "status" : "Unplugged", "voltage": 247.0, 
@@ -265,6 +267,16 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_value("debug_message"),"INFO: BOT:EMWERK-JB_1_1-1.4.0.28, 2021-04-27T20:39:50Z, ZentriOS-WZ-3.6.4.0")
         self.assertTrue(m.is_boot())
 
+    ISSUE_84_SAMPLE_MESSAGE = "0000000000000000000000000000:v09u,s997,F11,u00083333,V2475,L00006302485,S02,T20,M0040,C0040,m0040,t09,i13,e00000,f6002,r38,b000,B0000000,P0,E0015458,A00013,p0009!ACI:";
+
+    def test_issue_84(self):
+        m = juicebox_message_from_string(self.ISSUE_84_SAMPLE_MESSAGE)
+        self.assertEqual(1.3, m.get_processed_value("current"));
+        self.assertEqual(247.5, m.get_processed_value("voltage"));
+        self.assertEqual(322, m.get_processed_value("power"));
+        self.assertEqual(60.02, m.get_processed_value("frequency"));
+        self.assertEqual("Charging", m.get_processed_value("status"));
+        self.assertEqual(40, m.get_processed_value("current_max_offline"));
             
     def test_message_crcs(self):
         cmd_messages = [
@@ -292,6 +304,7 @@ class TestMessage(unittest.TestCase):
             self.V09U_SAMPLE,
             self.V07_SAMPLE,
             self.V07_SAMPLE_2,
+            self.ISSUE_84_SAMPLE_MESSAGE,
         ]
         
         debug_messages = [
