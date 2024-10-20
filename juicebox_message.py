@@ -130,7 +130,7 @@ FROM_JUICEBOX_FIELD_DEFS = {
     # X ?
     # Y ?
     # Calculated parameters
-    "power" : { "process" : process_power },
+    "power" : { "process" : process_power, "calculated" : True },
     }
 
 
@@ -368,11 +368,12 @@ class JuiceboxStatusMessage(JuiceboxMessage):
             else:
                data[k] = self.values[k]
 
-        # TODO: Check for a more generic way to have this calculated data               
-        if not FIELD_POWER in data:
-            power = self.get_processed_value(FIELD_POWER)
-            if not power is None:
-               data[FIELD_POWER] = power
+        for k in self.defs:
+           if ("calculated" in self.defs[k]) and self.defs[k]["calculated"]:
+               if not k in data:
+                  value = self.get_processed_value(k)
+                  if not k is None:
+                     data[k] = value
 
         # On original code the energy_session is chaged to zero when not charging
         # here we will keep sending the value that came from device
