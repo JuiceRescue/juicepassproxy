@@ -383,6 +383,12 @@ class JuiceboxMQTTHandler:
                 unit_of_measurement="W",
                 expire_after=7200,
             ),
+            "power_factor": JuiceboxMQTTSensor(
+                name="Power Factor",
+                state_class="measurement",
+                device_class="power_factor",
+                expire_after=7200,
+            ),
             # Make possible to control from HA when juicepassproxy will act as ENEL X server for the juicebox
             # Will only work when ignoring ENEL X server
             "act_as_server": JuiceboxMQTTSwitch(

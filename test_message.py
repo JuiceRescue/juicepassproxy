@@ -228,7 +228,7 @@ class TestMessage(unittest.TestCase):
         self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 39.4, "serial" : FAKE_SERIAL, "status" : "Charging", "voltage": 240.0, 
             "temperature" : 143.6, "energy_lifetime": 24880114,  "energy_session": 6804, "interval": 78, 
             "report_time": "09", "e" : "-001", "frequency" : 60.01, "loop_counter": "30048", 
-            "protocol_version" : "07", "p" : "0992", "current_max_online": 40, "current_rating": 40, 
+            "protocol_version" : "07", "power_factor" : 0.992, "current_max_online": 40, "current_rating": 40, 
             "power" : 9456,
             "X" : "0", "Y" : "0", "counter" : "0001" })
 
@@ -258,7 +258,7 @@ class TestMessage(unittest.TestCase):
         self.assertDictEqual(m.to_simple_format(), { "type" : "basic", "current" : 39.3, "serial" : FAKE_SERIAL, "status" : "Charging", "voltage": 242.2, 
             "temperature" : 141.8, "energy_lifetime": 24957914,  "energy_session": 19146, "interval": 51,  
             "report_time": "09", "e" : "-001", "frequency" : 60.01, "loop_counter": "16708", 
-            "protocol_version" : "07", "p" : "0992", "current_max_online": 40, "current_rating": 40, 
+            "protocol_version" : "07", "power_factor" : 0.992, "current_max_online": 40, "current_rating": 40, 
             "power" : 9518,
             "X" : "0", "Y" : "0", "counter" : "0177" })
 

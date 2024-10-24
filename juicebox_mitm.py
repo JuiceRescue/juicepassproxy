@@ -167,6 +167,7 @@ class JuiceboxMITM:
                     if decoded_message.has_value("current_max_online"):
                         _LOGGER.info("setting current_max_online_set with current_max_online")
                         await self._mqtt_handler.get_entity("current_max_online_set").set_state(self._last_status_message.get_processed_value("current_max_online"))
+                        
                     # Apparently all messages came with current_max_online then, this code will never be executed                            
                     elif ((elapsed > 600) or self._booted_in_less_than(30)) and decoded_message.has_value("current_rating"):
                         _LOGGER.info("setting current_max_online_set with current_rating")
@@ -183,6 +184,9 @@ class JuiceboxMITM:
                     elif (self._booted_in_less_than(30) or (elapsed > 6*60) ) and decoded_message.has_value("current_max_online"):
                         _LOGGER.info(f"setting current_max_offline_set with current_max_online after reboot or more than 5 minutes (elapsed={elapsed})") 
                         await self._mqtt_handler.get_entity("current_max_offline_set").set_state(self._last_status_message.get_processed_value("current_max_online"))
+
+                #TODO we still have a problem on v07 protocol that does not send the current_max_offline
+                # the entity will not be updated
                             
             elif isinstance(decoded_message, JuiceboxDebugMessage):
                 if decoded_message.is_boot():
