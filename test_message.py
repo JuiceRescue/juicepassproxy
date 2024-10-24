@@ -191,6 +191,8 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.crc_str, self.V09U_SAMPLE[(chkidx+1):(chkidx+4)])
         self.assertEqual(m.get_processed_value("status"), "Charging")
         self.assertEqual(m.get_processed_value("voltage"), 136.6)
+        self.assertEqual(m.get_processed_value("current"), 16.1)
+        self.assertEqual(m.get_processed_value("power"), 2199)
         self.assertEqual(m.get_processed_value("current_rating"), 32)
         self.assertEqual(m.get_processed_value("current_max_online"), 24)
         self.assertEqual(m.get_processed_value("current_max_offline"), 24)
@@ -213,6 +215,7 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_processed_value("voltage"), 240.0)
         self.assertEqual(m.get_processed_value("frequency"), 60.01)
         self.assertEqual(m.get_processed_value("current"), 39.4)
+        self.assertEqual(m.get_processed_value("power"), 9456)
         self.assertEqual(m.get_processed_value("current_rating"), 40)
         self.assertEqual(m.get_processed_value("current_max_online"), 40)
         # The process will return value for this parameter that are not comming on the message
@@ -242,6 +245,7 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(m.get_processed_value("voltage"), 242.2)
         self.assertEqual(m.get_processed_value("frequency"), 60.01)
         self.assertEqual(m.get_processed_value("current"), 39.3)
+        self.assertEqual(m.get_processed_value("power"), 9518)
         self.assertEqual(m.get_processed_value("current_rating"), 40)
         self.assertEqual(m.get_processed_value("current_max_online"), 40)
         # The process will return value for this parameter that are not comming on the message
