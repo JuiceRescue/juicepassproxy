@@ -240,6 +240,18 @@ As of November, 2023: `juicenet-udp-prod3-usa.enelx.com` = `54.161.185.130`.
 - **Max Current (Online/Device)**
    - The value that are sent from the juicebox device indicating what will the online charge current
 
+
+- Warning about offline / online
+   - Apparently some devices consider offline as a maximum that can be used on device, and even if you put online over that it will consider the minimum value
+       - https://github.com/JuiceRescue/juicepassproxy/pull/69#issuecomment-2408423204
+   - Tests on one JB 2.x / v09u indicates that the online value can be over the offline value for charging
+      - This will allow safe usage of load-balancing logic from a server and use lower values for safety
+      - If you have one of this devices and have limited circuit you must respect your circuit limits when changing the online value
+
+## Energy
+- **Energy Session**
+   - the Juicebox device reset this value when car changes from **Charging** to **Plugged In** State
+
 ## Multiple JuiceBoxes
 - Multiple instances of JPP must be executed, one per JuiceBox.
     - Each JPP instance should specify the following parameters in addition to the basic parameters.
