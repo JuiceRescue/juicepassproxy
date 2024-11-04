@@ -1,5 +1,5 @@
 #
-# Original source  : https://github.com/philipkocanda/juicebox-protocol
+# Inspired on : https://github.com/philipkocanda/juicebox-protocol
 #
 from juicebox_crc import JuiceboxCRC
 from juicebox_exceptions import JuiceboxInvalidMessageFormat

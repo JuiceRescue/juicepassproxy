@@ -1,5 +1,5 @@
 #
-# Original source  : https://github.com/philipkocanda/juicebox-protocol
+# Original code : https://github.com/philipkocanda/juicebox-protocol
 #
 class JuiceboxCRC:
     ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
