@@ -281,7 +281,24 @@ class TestMessage(unittest.TestCase):
         self.assertEqual(60.02, m.get_processed_value("frequency"));
         self.assertEqual("Charging", m.get_processed_value("status"));
         self.assertEqual(40, m.get_processed_value("current_max_offline"));
+
+    # Serial was changed            
+    # testing indicates that the '\xc3' is garbage on the received message, the fields appear to be correct but CRC was wrong
+    ISSUE_111_SAMPLE_MESSAGE_WRONG = b'0\xc300000000000000000000000000:v07,s0,u6623,V2479,L20710648,S1,T25,M24,m32,t30,i50,e0,f6002,X0,Y0!JLA:\n'
+    ISSUE_111_SAMPLE_MESSAGE       = b'000000000000000000000000000:v07,s0,u6623,V2479,L20710648,S1,T25,M24,m32,t30,i50,e0,f6002,X0,Y0!JLA:\n'
+
+    def test_issue_111_wrong(self):
+        with self.assertRaises(JuiceboxInvalidMessageFormat):
+            juicebox_message_from_bytes(self.ISSUE_111_SAMPLE_MESSAGE_WRONG)
+
+    def test_issue_111(self):
+        m = juicebox_message_from_bytes(self.ISSUE_111_SAMPLE_MESSAGE)
+        self.assertEqual(247.9, m.get_processed_value("voltage"))
+        self.assertEqual(24, m.get_processed_value("current_max_online"))
+        self.assertEqual("07", m.get_processed_value("protocol_version"))
+        self.assertEqual(77, m.get_processed_value("temperature"))
             
+
     def test_message_crcs(self):
         cmd_messages = [
             'CMD41325A0040M040C006S638!5N5$', # @MrDrew514 (v09u)

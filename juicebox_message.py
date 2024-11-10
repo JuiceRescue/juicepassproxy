@@ -152,8 +152,12 @@ def juicebox_message_from_bytes(data : bytes):
        string = data.decode("utf-8")
        return juicebox_message_from_string(string)
    except UnicodeDecodeError:
-       # Probably is a encrypted messsage, try to use the specific classe
-       return JuiceboxEncryptedMessage().from_bytes(data)
+       # Probably is a encrypted messsage, try to use the specific class
+       try:
+           return JuiceboxEncryptedMessage().from_bytes(data)
+       except UnicodeDecodeError:
+           raise JuiceboxInvalidMessageFormat(f"Unable to parse message: '{data}'")
+           
    
 
 #
@@ -203,7 +207,7 @@ def juicebox_message_from_string(string : str):
           return JuiceboxDebugMessage().from_string(string)
       else:   
           return JuiceboxStatusMessage(False).from_string(string)
-      
+          
    raise JuiceboxInvalidMessageFormat(f"Unable to parse message: '{string}'")
       
       
@@ -254,11 +258,15 @@ class JuiceboxMessage:
         self.payload_str = msg.group(PATTERN_GROUP_PAYLOAD)
         self.crc_str = msg.group(PATTERN_GROUP_CRC)
 
-        if not self.has_crc and self.crc_str:
-            raise JuiceboxInvalidMessageFormat(f"Found crc in message that are supposed to dont have crc '{string}'")
-
-        if self.has_crc and not self.crc_str:
-            raise JuiceboxInvalidMessageFormat(f"CRC not found in message that are supposed to have crc '{string}'")
+        if not self.has_crc:
+            if self.crc_str:
+                raise JuiceboxInvalidMessageFormat(f"Found CRC in message that are supposed to don't have CRC '{string}'")
+        else:
+            if not self.crc_str:
+                raise JuiceboxInvalidMessageFormat(f"CRC not found in message that are supposed to have CRC '{string}'")
+                
+            if self.crc_str != self.crc_computed():
+                raise JuiceboxInvalidMessageFormat(f"Expected CRC {self.crc_computed()} '{string}'")
 
         values = {}        
         tmp = self.payload_str
