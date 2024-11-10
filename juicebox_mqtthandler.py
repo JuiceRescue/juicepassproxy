@@ -159,8 +159,8 @@ class JuiceboxMQTTSendingEntity(JuiceboxMQTTEntity):
         """
         state = message.payload.decode()
         _LOGGER.info(
-            f"{self.entity_type.title()} Callback ({self.name}): {
-                state}. User Data: {user_data}"
+            f"{self.entity_type.title()} Callback ({self.name}): "
+            f"{state}. User Data: {user_data}"
         )
         if self._mitm_handler:
             if user_data == 'RAW':
