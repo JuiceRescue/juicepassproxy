@@ -90,6 +90,7 @@ Variable | Required | Description & Default |
 **MQTT_USER** | No |
 **MQTT_PASS** | No |
 **MQTT_DISCOVERY_PREFIX** | No | homeassistant
+**LOG_LOC** | No | /log (use **none** to disable log to file)
 
 <details>
 <summary><h3>Less Common Docker Environment Variables</h3></summary>

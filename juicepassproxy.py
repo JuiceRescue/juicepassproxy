@@ -359,29 +359,33 @@ async def parse_args():
 
 async def main():
     args = await parse_args()
+    log_handlers = [ logging.StreamHandler() ]
+    enable_file_log = (len(args.log_loc) > 0) and (args.log_loc != 'none')
     log_loc = Path(args.log_loc)
-    log_loc.mkdir(parents=True, exist_ok=True)
-    log_loc = log_loc.joinpath(LOGFILE)
-    log_loc.touch(exist_ok=True)
+    if enable_file_log:
+        log_loc.mkdir(parents=True, exist_ok=True)
+        log_loc = log_loc.joinpath(LOGFILE)
+        log_loc.touch(exist_ok=True)
+        log_handlers.append(TimedRotatingFileHandler(
+                log_loc, when="midnight", backupCount=DAYS_TO_KEEP_LOGS
+            ))
     logging.basicConfig(
         format=LOG_FORMAT,
         datefmt=LOG_DATE_FORMAT,
         level=DEFAULT_LOGLEVEL,
-        handlers=[
-            logging.StreamHandler(),
-            TimedRotatingFileHandler(
-                log_loc, when="midnight", backupCount=DAYS_TO_KEEP_LOGS
-            ),
-        ],
+        handlers=log_handlers,
         force=True,
     )
     if args.debug:
         _LOGGER.setLevel(logging.DEBUG)
     _LOGGER.warning(
         f"Starting JuicePass Proxy {VERSION} "
-        f"(Log Level: {logging.getLevelName(_LOGGER.getEffectiveLevel())})"
+        f"(Log Level: {logging.getLevelName(_LOGGER.getEffectiveLevel())}, log_handlers={len(log_handlers)})"
     )
-    _LOGGER.info(f"log_loc: {log_loc}")
+    if enable_file_log:
+        _LOGGER.info(f"log_loc: {log_loc}")
+    else:
+        _LOGGER.info("not logging to file")
     if len(sys.argv) == 1:
         _LOGGER.error(
             "Exiting: no command-line arguments given. Run with --help to see options."
