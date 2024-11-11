@@ -264,7 +264,7 @@ async def parse_args():
         "--log_loc",
         type=str,
         metavar="LOC",
-        default=Path.home(),
+        default=str(Path.home()),
         help="The location to store the log files (default: %(default)s)",
     )
 
