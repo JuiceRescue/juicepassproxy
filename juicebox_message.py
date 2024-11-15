@@ -407,9 +407,9 @@ class JuiceboxEncryptedMessage(JuiceboxStatusMessage):
       
        if msg:
            if is_encrypted_version(msg.group(PATTERN_GROUP_VERSION)):
-               _LOGGER.warning(f"TODO: encrypted {data}")
-               # TODO
-               return self
+             _LOGGER.warning(f"TODO: encrypted {data}")
+             # TODO unencrypt when we know how to do
+             return self
            else:
              raise JuiceboxInvalidMessageFormat(f"Unsupported encrypted message version: '{data}'")
            

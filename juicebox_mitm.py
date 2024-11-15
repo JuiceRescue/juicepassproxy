@@ -154,7 +154,12 @@ class JuiceboxMITM:
         decoded_message = None
         try:
             decoded_message = juicebox_message_from_bytes(data)
-            if isinstance(decoded_message, JuiceboxStatusMessage):
+            if isinstance(decoded_message, JuiceboxEncryptedMessage):
+                # encrypted are not supported now
+                # directory server can set the encripted mode, to disable the JuiceBox must be blocked to access the Directory Server
+                _LOGGER.error("Encrypted messages are not supported yet, please restart yout Juicebox device without internet connection to be able to use unencrypted messages")
+                decoded_message = None
+            elif isinstance(decoded_message, JuiceboxStatusMessage):
                 self._last_status_message = decoded_message
                 if self._first_status_message_timestamp is None:
                    self._first_status_message_timestamp = time.time()
@@ -191,6 +196,8 @@ class JuiceboxMITM:
             elif isinstance(decoded_message, JuiceboxDebugMessage):
                 if decoded_message.is_boot():
                     self._boot_timestamp = time.time()
+            else:
+                _LOGGER.exception(f"Unexpected juicebox message type {decoded_message}")
           
         except Exception as e:
             _LOGGER.exception(f"Not a valid juicebox message |{data}| {e}")
