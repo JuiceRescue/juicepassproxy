@@ -187,7 +187,8 @@ PAYLOAD_PARTS_PATTERN = r'((?P<' + FIELD_SERIAL + '>[0-9]+):)?[,]?(?P<' + PATTER
    
 def is_encrypted_version(version : str):
    #   https://github.com/snicker/juicepassproxy/issues/73
-   return version == 'v09e'
+   #   https://github.com/snicker/juicepassproxy/issues/116   
+   return (version == 'v09e') or (version == 'v08')
    
 def juicebox_message_from_string(string : str):
    if string[0:3] == "CMD":
@@ -402,16 +403,18 @@ class JuiceboxEncryptedMessage(JuiceboxStatusMessage):
     
     def from_bytes(self, data : bytes):
        # get only serial and version 
-       string = data[0:33].decode("utf-8")
+       
+       string = data[0:(33 if chr(data[32]) in ['e','u'] else 32)].decode("utf-8")
        msg = re.search(BASE_MESSAGE_PATTERN, string)
       
        if msg:
-           if is_encrypted_version(msg.group(PATTERN_GROUP_VERSION)):
-             _LOGGER.warning(f"TODO: encrypted {data}")
+           version = msg.group(PATTERN_GROUP_VERSION)
+           if is_encrypted_version(version):
+             _LOGGER.warning(f"TODO: encrypted '{version}' - '{data}'")
              # TODO unencrypt when we know how to do
              return self
            else:
-             raise JuiceboxInvalidMessageFormat(f"Unsupported encrypted message version: '{data}'")
+             raise JuiceboxInvalidMessageFormat(f"Unsupported encrypted message version: '{version}' - '{data}'")
            
        else:
            raise JuiceboxInvalidMessageFormat(f"Unsupported message format: '{data}'")

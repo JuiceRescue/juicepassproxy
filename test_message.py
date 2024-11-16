@@ -44,6 +44,15 @@ class TestMessage(unittest.TestCase):
             m = juicebox_message_from_bytes(codecs.decode(message,'hex'))
             self.assertEqual(JuiceboxEncryptedMessage, type(m))
     
+    def test_entrypted_message_v08(self):
+        messages = [
+            # https://github.com/JuiceRescue/juicepassproxy/issues/116
+            b"0910000000000000000000000000:v08\x9a\xa0\x1d\x00\x00\x00\x00\x94"
+        ]
+        for message in messages:
+            m = juicebox_message_from_bytes(message)
+            self.assertEqual(JuiceboxEncryptedMessage, type(m))
+    
     def test_message_validation(self):
         messages = [
             "g4rbl3d",
