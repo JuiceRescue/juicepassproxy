@@ -84,8 +84,14 @@ class JuiceboxMQTTEntity:
                 # float to be used by any number, JuiceboxMessage will use int
                 getattr(self._mqtt, self._set_func)(float(state))
             elif self.entity_type == 'switch':
-                # float to be used by any number, JuiceboxMessage will use int
-                getattr(self._mqtt, self._set_func)(state.lower() == 'on')
+                # This works with ha-mqtt-discoverable after v0.14.0 
+                # but for ARM we need older version 
+                # getattr(self._mqtt, self._set_func)(state.lower() == 'on')
+                # workaround calling the on/off methods
+                if (state.lower() == 'on'):
+                   self._mqtt.on()
+                else:
+                   self._mqtt.off()
             else:
                 getattr(self._mqtt, self._set_func)(state)
         except AttributeError as e:
@@ -211,7 +217,7 @@ class JuiceboxMQTTSwitch(JuiceboxMQTTSendingEntity):
         name,
         **kwargs,
     ):
-        # _LOGGER.debug(f"Boolean Init: {name}")
+        # _LOGGER.debug(f"Switch Init: {name}")
         self.entity_type = "switch"
         self._set_func = "update_state"
         super().__init__(name, **kwargs)
