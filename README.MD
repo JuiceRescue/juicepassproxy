@@ -119,7 +119,8 @@ Variable | Required | Description & Default |
 **DEVICE_NAME** | No | JuiceBox
 **DEBUG** | No | false
 **EXPERIMENTAL**  | No  | Default: false. Enables additional entities in Home Assistant that are in in development or can be used toward developing the ability to send commands to a JuiceBox
-**IGNORE_ENELX**  | No  | Default: false. If true, will not send commands received from EnelX to the JuiceBox nor send outgoing information from the JuiceBox to EnelX
+**IGNORE_ENELX**  | No  | Default: false. If true, will not send commands received from EnelX to the JuiceBox nor send outgoing information from the JuiceBox to
+EnelX, to use local control this option should be true
 **TELNET_TIMEOUT**  | No  | Default: 30. Timeout in seconds for telnet operations.
 **JUICEBOX_ID**  | No | If not defined, will attempt to get the JuiceBox ID using telnet, don't use this if you are testing multiple devices.
 **LOCAL_IP**<br><br>_Deprecated Variable: SRC_ | No | If not defined, will attempt to get the Local Docker IP. Can optionally define port (ex. 127.0.0.1:8047). If unsuccessful, will default to 127.0.0.1.
