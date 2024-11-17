@@ -158,7 +158,6 @@ class JuiceboxMITM:
                 # encrypted are not supported now
                 # directory server can set the encripted mode, to disable the JuiceBox must be blocked to access the Directory Server
                 _LOGGER.error("Encrypted messages are not supported yet, please restart yout Juicebox device without internet connection to be able to use unencrypted messages")
-                decoded_message = None
             elif isinstance(decoded_message, JuiceboxStatusMessage):
                 self._last_status_message = decoded_message
                 if self._first_status_message_timestamp is None:

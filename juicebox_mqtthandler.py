@@ -1,13 +1,12 @@
 import asyncio
 import logging
-import re
 import time
 
 import ha_mqtt_discoverable.sensors as ha_mqtt
 from const import ERROR_LOOKBACK_MIN, VERSION  # MAX_ERROR_COUNT,
 from ha_mqtt_discoverable import DeviceInfo, Settings
 from paho.mqtt.client import Client, MQTTMessage
-from juicebox_message import JuiceboxStatusMessage, JuiceboxDebugMessage
+from juicebox_message import JuiceboxStatusMessage, JuiceboxDebugMessage, JuiceboxEncryptedMessage
 
 _LOGGER = logging.getLogger(__name__)
 MQTT_SENDING_ENTITIES = ["text", "number", "switch", "button"]
@@ -475,75 +474,6 @@ class JuiceboxMQTTHandler:
             if entity.entity_type in MQTT_SENDING_ENTITIES:
                 entity.add_kwargs(mitm_handler=mitm_handler)
 
-    # TODO: To be removed as the the message is now parsed on JuiceboxMessage
-    async def _basic_message_parse(self, data: bytes):
-
-        message = {"type": "basic", "current": 0, "energy_session": 0}
-        active = True
-        
-        parts = re.split(r",|!|:", data.decode("utf-8"))
-        parts.pop(0)  # JuiceBox ID
-        parts.pop(-1)  # Ending blank
-        parts.pop(-1)  # CRC
-
-        for part in parts:
-            if part[0] == "S":
-                message["status"] = {
-                    "S0": "Unplugged",
-                    "S1": "Plugged In",
-                    "S2": "Charging",
-                    "S5": "Error",
-                    "S00": "Unplugged",
-                    "S01": "Plugged In",
-                    "S02": "Charging",
-                    "S05": "Error",
-                }.get(part)
-                if message["status"] is None:
-                    message["status"] = f"unknown {part}"
-                active = message["status"].lower() == "charging"
-            elif part[0] == "A":
-                message["current"] = (
-                    round(float(part.split("A")[1]) * 0.1, 2) if active else 0
-                )
-            elif part[0] == "m":
-                message["current_rating"] = float(part.split("m")[1])
-            elif part[0] == "C":
-                message["current_max_offline"] = float(part.split("C")[1])
-            elif part[0] == "M":
-                message["current_max_online"] = float(part.split("M")[1])
-            elif part[0] == "f":
-                message["frequency"] = round(float(part.split("f")[1]) * 0.01, 2)
-            elif part[0] == "L":
-                message["energy_lifetime"] = float(part.split("L")[1])
-            elif part[0] == "v":
-                message["protocol_version"] = part.split("v")[1]
-            elif part[0] == "E":
-                message["energy_session"] = float(part.split("E")[1]) if active else 0
-            elif part[0] == "t":
-                message["report_time"] = part.split("t")[1]
-            elif part[0] == "v":
-                message["protocol_version"] = part.split("v")[1]
-            elif part[0] == "i":
-                message["interval"] = part.split("i")[1]
-            elif part[0] == "u":
-                message["loop_counter"] = part.split("u")[1]
-            elif part[0] == "T":
-                message["temperature"] = round(float(part.split("T")[1]) * 1.8 + 32, 2)
-            elif part[0] == "V":
-                # Device that does not send protocol_version dont send decimal value for Voltage
-                if message["protocol_version"]:
-                    message["voltage"] = round(float(part.split("V")[1]) * 0.1, 2)
-                else:
-                    message["voltage"] = round(float(part.split("V")[1]), 2)
-            else:
-                message["unknown_" + part[0]] = part[1:]
-        message["power"] = round(
-            message.get("voltage", 0) * message.get("current", 0), 2
-        )
-
-        message["data_from_juicebox"] = data.decode("utf-8")
-        return message
-
     async def _udp_mitm_oserror_message_parse(self, data):
         message = {"type": "udp_mitm_oserror"}
         err_data = str(data).split("|")
@@ -552,29 +482,6 @@ class JuiceboxMQTTHandler:
             f"JuiceboxMITM {err_data[1].title()} OSError {err_data[3]} "
             f"[{err_data[2]}]: {err_data[4]}"
         )
-        return message
-
-    async def _debug_message_parse(self, data):
-        message = {"type": "debug"}
-
-        dbg_data = (
-            data.decode("utf-8")
-            .replace("https://", "https//")
-            .replace("http://", "http//")
-        )
-        dbg_level_abbr = dbg_data.split(":")[1].split(",")[1]
-        if dbg_level_abbr == "NFO":
-            dbg_level = "INFO"
-        elif dbg_level_abbr == "WRN":
-            dbg_level = "WARNING"
-        elif dbg_level_abbr == "ERR":
-            dbg_level = "ERROR"
-        else:
-            dbg_level = dbg_level_abbr
-        dbg_data = dbg_data[dbg_data.find(":", dbg_data.find(":") + 1) + 1: -1]
-        dbg_msg = dbg_data.replace("https//", "https://").replace("http//", "http://")
-
-        message["debug_message"] = f"{dbg_level}: {dbg_msg}"
         return message
 
     async def _store_if_on_message(self, message, key):
@@ -649,28 +556,27 @@ class JuiceboxMQTTHandler:
                 message = await self._udp_mitm_oserror_message_parse(data)
                 
             # Now using the classes as priority over older code
+            elif isinstance(decoded_message, JuiceboxEncryptedMessage):
+                _LOGGER.warning(f"Encrypted messages will not be sent to mqtt - {decoded_message}")
             elif isinstance(decoded_message, JuiceboxStatusMessage):
                 message = decoded_message.to_simple_format()
             elif isinstance(decoded_message, JuiceboxDebugMessage):
                 message = decoded_message.to_simple_format()
-            # still using old code for messages that cannot be decoded                
-            # should be removed in future versions
-            elif ":DBG," in str(data):
-                message = await self._debug_message_parse(data)
             else:
-                message = await self._basic_message_parse(data)
+                _LOGGER.error(f"should never arrive here, message is unsupported {data} {decoded_message}")
         
             _LOGGER.debug(f"decode/parsed message = {message}")
             
-            # Something is wrong if device is changed
-            # as the entities use the juicebox_id as unique_id this should not happen
-            if "serial" in message:
-                if message["serial"] != self._juicebox_id:
-                    _LOGGER.error(f"serial {message['serial']} on received message does not match juicebox_id {self._juicebox_id}")
-                    # For now just give the error, but will be better to dont send values on entities and return 
-            
             if message:
+                # Something is wrong if device is changed
+                # as the entities use the juicebox_id as unique_id this should not happen
+                if "serial" in message:
+                   if message["serial"] != self._juicebox_id:
+                       _LOGGER.error(f"serial {message['serial']} on received message does not match juicebox_id {self._juicebox_id}")
+                       # For now just give the error, but will be better to dont send values on entities and return 
+            
                 await self._basic_message_publish(message)
+
             return data
         except IndexError as e:
             await self._add_error()
