@@ -150,6 +150,7 @@ class JuiceboxUDPCUpdater:
                 not in connections[udpc_streams_to_close[udpc_stream_to_update]]["dest"]
             ):
                 _LOGGER.info("UDPC IP incorrect, updating")
+                _LOGGER.debug(f"connections: {connections}")
             elif len(udpc_streams_to_close) == 1:
                 _LOGGER.info("UDPC IP correct")
                 update_required = False
