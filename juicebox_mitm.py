@@ -344,8 +344,10 @@ class JuiceboxMITM:
 
     # Send a new message using values on mqtt entities
     async def send_cmd_message_to_juicebox(self, new_values):
-       
-       if self._mqtt_handler.get_entity("act_as_server").is_on():
+       if not self._ignore_enelx:
+          _LOGGER.warning("To send commands to juicebox you have to ignore ENEL X servers, please set ignore_enelx option")
+          
+       elif self._mqtt_handler.get_entity("act_as_server").is_on():
 
           cmd_message = await self.__build_cmd_message(new_values)
           if cmd_message:
