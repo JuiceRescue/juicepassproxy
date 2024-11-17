@@ -26,7 +26,8 @@ class JuiceboxCRC:
     def base35encode(self, number: int) -> str:
         base35 = ""
 
-        while number > 1:
+        # Sometimes it ends with 0 and the juicebox CRC should have 3 characters
+        while (number > 1) or (len(base35) < 3):
             number, i = divmod(number, 35)
             if i == 24:
                 i = 35

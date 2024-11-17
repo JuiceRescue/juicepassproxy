@@ -267,7 +267,7 @@ class JuiceboxMessage:
                 raise JuiceboxInvalidMessageFormat(f"CRC not found in message that are supposed to have CRC '{string}'")
                 
             if self.crc_str != self.crc_computed():
-                raise JuiceboxInvalidMessageFormat(f"Expected CRC {self.crc_computed()} '{string}'")
+                raise JuiceboxInvalidMessageFormat(f"Expected CRC {self.crc_computed()} detected_crc={self.crc_str} '{string}'")
 
         values = {}        
         tmp = self.payload_str
