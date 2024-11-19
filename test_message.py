@@ -32,7 +32,7 @@ class TestMessage(unittest.TestCase):
         self.do_test_message_building(True, 16, 20, "CMD52324A0020M016C006S001!YUK$")
 
 
-    def test_entrypted_message(self):
+    def test_encrypted_message(self):
         messages = [
             # https://github.com/snicker/juicepassproxy/issues/73#issuecomment-2149670058
             "303931303034323030313238303636303432373332333632303533353a7630396512b10a000000716b1493270404a809cbcbb7995fd86b391e4b5e606fd5153a81ecd6251eb2bf87da82db9ceaefb268caa8f0c01b538af48e45d1ef3ad28ca72a4fdf05261780fd753b361906368634821bf6cada5624bae11feb7dc975cfe14e2c305eb01adcc7b39687ddc130d66cc39bc2ccac7f903cb9b50adb9a77b95b77bd364b82dcbe8599dc9a8a880cc44eb0f04e8a1d9f4a6305978a7f3e3c58d5"
@@ -44,7 +44,7 @@ class TestMessage(unittest.TestCase):
             m = juicebox_message_from_bytes(codecs.decode(message,'hex'))
             self.assertEqual(JuiceboxEncryptedMessage, type(m))
     
-    def test_entrypted_message_v08(self):
+    def test_encrypted_message_v08(self):
         messages = [
             # https://github.com/JuiceRescue/juicepassproxy/issues/116
             b"0910000000000000000000000000:v08\x9a\xa0\x1d\x00\x00\x00\x00\x94"
