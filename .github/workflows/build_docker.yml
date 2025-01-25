@@ -10,7 +10,6 @@ on:
 
 jobs:
   build_and_publish_docker_image:
-    if: github.repository_owner == 'snicker'
     runs-on: ubuntu-latest
     steps:      
       - name: Debug Variables
