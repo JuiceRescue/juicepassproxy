@@ -6,8 +6,6 @@ It can also publish the IP of the proxy to the JuiceBox directly to avoid using 
 
 Builds upon work by lovely folks in this issue: https://github.com/home-assistant/core/issues/86588
 
-_Hopefully we won't need this if EnelX fixes their API!_
-
 #### It is required that both your JuiceBox and the machine you are running `juicepassproxy` on have internal, static IPs on your intranet.
 
 ## Docker Compose Installation
@@ -75,7 +73,7 @@ networks:
 
 services:
   juicepassproxy:
-    image: ghcr.io/snicker/juicepassproxy:latest
+    image: ghcr.io/juicerescue/juicepassproxy:latest
     hostname: juicepassproxy
     container_name: juicepassproxy
     restart: unless-stopped
@@ -238,7 +236,7 @@ As of November, 2023: `juicenet-udp-prod3-usa.enelx.com` = `54.161.185.130`.
 - **Max Current (Offline/Wanted)**
    - Control maximum current that device will charge when offline (not connected to juicebox or Enel X)
       - 2024-06 tested on device which send protocol v09u it changes **Max Charging Current** to this value around 5 minutes after not receiving messages from proxy
-   - Stored on EEPROM - https://github.com/snicker/juicepassproxy/issues/39#issuecomment-2002312548
+   - Stored on EEPROM - https://github.com/JuiceRescue/juicepassproxy/issues/39#issuecomment-2002312548
       - Because of this **don't change that value many times**, as any EEPROM has a lifespan based on writes and the *Max Charging Current* will make possible to control the Current for Charging
 
 - **Max Current (Offline/Device)**
