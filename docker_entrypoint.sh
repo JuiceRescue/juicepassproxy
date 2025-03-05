@@ -103,7 +103,7 @@ else
 fi
 if [[ ! -z "${CRON_REBOOT_SCHEDULE}" ]]; then
   logger INFO "CRON_REBOOT_SCHEDULE: ${CRON_REBOOT_SCHEDULE}"
-  ESCAPED_CRON_REBOOT_SCHEDULE=$(printf '%s' "${CRON_REBOOT_SCHEDULE}" | sed 's/\*/\\*/g')
+  ESCAPED_CRON_REBOOT_SCHEDULE=$(printf '%s' "${CRON_REBOOT_SCHEDULE}")
   JPP_STRING+=" --cron_reboot_schedule '${ESCAPED_CRON_REBOOT_SCHEDULE}'"
 fi
 
