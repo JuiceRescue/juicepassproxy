@@ -103,7 +103,7 @@ else
 fi
 if [[ ! -z "${CRON_REBOOT_SCHEDULE}" ]]; then
   logger INFO "CRON_REBOOT_SCHEDULE: ${CRON_REBOOT_SCHEDULE}"
-  JPP_STRING+=" --cron_reboot_schedule \"${CRON_REBOOT_SCHEDULE}\""
+  JPP_STRING+=" --cron_reboot_schedule '${CRON_REBOOT_SCHEDULE}'"
 
 fi
 
