@@ -179,7 +179,7 @@ async def get_juicebox_id(juicebox_host, telnet_port, telnet_timeout=None):
     return None
 
 
-async def send_reboot_command(juicebox_host, telnet_port, mqtt_handler, telnet_timeout, udpc_updater, jpp_task_list):
+async def send_reboot_command(juicebox_host, telnet_port, mqtt_handler, telnet_timeout, udpc_updater):
     try:
         entity_values = mqtt_handler.get_entity_values()
         
@@ -196,11 +196,6 @@ async def send_reboot_command(juicebox_host, telnet_port, mqtt_handler, telnet_t
             ) as tn:
                 await tn.send_command("reboot")
                 _LOGGER.info("Reboot command sent successfully.")
-                # await asyncio.sleep(30)
-                # jpp_task_list.append(
-                #     asyncio.create_task(udpc_updater.start(), name="udpc_updater")
-                # )
-                # _LOGGER.info("UDPC Updater restarted.")
         else:
             _LOGGER.warning("Juicebox status is not 'Unplugged'. Reboot command not sent.")
     except TimeoutError as e:
