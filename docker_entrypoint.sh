@@ -106,5 +106,5 @@ if [[ ! -z "${CRON_REBOOT_SCHEDULE}" ]]; then
   JPP_STRING+=" --cron_reboot_schedule \"${CRON_REBOOT_SCHEDULE}\""
 fi
 
-logger DEBUG "COMMAND: $(echo ${JPP_STRING} | sed -E 's/(.* --mqtt_password )([\"]?[a-zA-Z0-9_\?\*\^\&\#\@\!]+[\"]?)/\1*****/g')"
+logger DEBUG "COMMAND: $(echo "${JPP_STRING}" | sed -E 's/(.* --mqtt_password )([\"]?[a-zA-Z0-9_\?\*\^\&\#\@\!]+[\"]?)/\1*****/g')"
 exec bash -c "${JPP_STRING}"
