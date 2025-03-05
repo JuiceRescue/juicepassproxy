@@ -181,10 +181,6 @@ async def get_juicebox_id(juicebox_host, telnet_port, telnet_timeout=None):
 
 async def send_reboot_command(juicebox_host, telnet_port, mqtt_handler, telnet_timeout=None):
     try:
-        # Get the current values of the entities
-        mqtt_handler = JuiceboxMQTTHandler(
-            # ...existing initialization parameters...
-        )
         entity_values = mqtt_handler.get_entity_values()
         
         # Validate the 'status' of the juicebox is 'Unplugged'
