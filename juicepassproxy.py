@@ -632,7 +632,7 @@ async def main():
 
         if args.cron_reboot_schedule:
             jpp_task_list.append(
-                asyncio.create_task(scheduled_task(args.cron_reboot_schedule, send_reboot_command, args.juicebox_host, args.telnet_port, mqtt_handler, telnet_timeout=telnet_timeout), name="scheduled_task")
+                asyncio.create_task(scheduled_task(args.cron_reboot_schedule, send_reboot_command, args.juicebox_host, args.telnet_port, mqtt_handler, telnet_timeout), name="scheduled_task")
             )
 
         try:
