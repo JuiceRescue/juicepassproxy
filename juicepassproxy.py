@@ -103,6 +103,7 @@ async def resolve_ip_external_dns(address, use_dns=EXTERNAL_DNS):
         dns.resolver.LifetimeTimeout,
         dns.resolver.NoNameservers,
         dns.resolver.NoAnswer,
+        dns.resolver.NXDOMAIN,
     ) as e:
         _LOGGER.warning(
             f"Unable to resolve {address}. ({e.__class__.__qualname__}: {e})"
